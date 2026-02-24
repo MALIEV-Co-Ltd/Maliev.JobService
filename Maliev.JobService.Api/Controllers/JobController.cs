@@ -47,6 +47,8 @@ public class JobController : ControllerBase
     /// <summary>
     /// Gets a specific job by its ID.
     /// </summary>
+    /// <param name="id">The unique identifier of the job.</param>
+    /// <returns>The job DTO if found; otherwise, NotFound.</returns>
     [HttpGet("{id}")]
     public async Task<ActionResult<JobDto>> GetById(Guid id)
     {
@@ -60,6 +62,15 @@ public class JobController : ControllerBase
     /// <summary>
     /// Retrieves a paged list of jobs with optional filtering.
     /// </summary>
+    /// <summary>
+    /// Retrieves a paged list of jobs with optional filtering.
+    /// </summary>
+    /// <param name="status">Optional status filter.</param>
+    /// <param name="technology">Optional technology filter.</param>
+    /// <param name="assignedMachineId">Optional machine ID filter.</param>
+    /// <param name="page">The page number.</param>
+    /// <param name="pageSize">The page size.</param>
+    /// <returns>A paged result of job DTOs.</returns>
     [HttpGet]
     public async Task<ActionResult<PagedResult<JobDto>>> GetJobs(
         [FromQuery] JobStatus? status,
@@ -82,12 +93,13 @@ public class JobController : ControllerBase
         var total = await query.CountAsync();
         var totalPages = (int)Math.Ceiling(total / (double)Math.Clamp(pageSize, 1, 100));
         
-        var items = await query
+        var dbItems = await query
             .OrderByDescending(j => j.CreatedAt)
             .Skip((Math.Max(1, page) - 1) * Math.Clamp(pageSize, 1, 100))
             .Take(Math.Clamp(pageSize, 1, 100))
-            .Select(j => JobDto.FromEntity(j))
             .ToListAsync();
+        
+        var items = dbItems.Select(JobDto.FromEntity).ToList();
         
         _logger.LogInformation("Retrieved {Count} jobs (page {Page} of {TotalPages})", items.Count, page, totalPages);
         
@@ -102,13 +114,16 @@ public class JobController : ControllerBase
     }
 
     /// <summary>
-    /// Retrieves the jobs in a Kanban board format.
+    /// Retrieves the jobs in a Kanban board format, filtered to active or recently updated jobs.
     /// </summary>
+    /// <returns>The Kanban board data.</returns>
     [HttpGet("kanban")]
     public async Task<ActionResult<KanbanResponse>> GetKanban()
     {
+        var recentThreshold = DateTime.UtcNow.AddDays(-7);
         var jobs = await _dbContext.Jobs
             .AsNoTracking()
+            .Where(j => (j.Status != JobStatus.Completed && j.Status != JobStatus.Cancelled) || j.UpdatedAt > recentThreshold)
             .OrderBy(j => j.Priority)
             .ToListAsync();
         
@@ -130,6 +145,9 @@ public class JobController : ControllerBase
     /// <summary>
     /// Queues a job on a specific machine.
     /// </summary>
+    /// <param name="id">The job ID.</param>
+    /// <param name="request">The queue request containing machine ID.</param>
+    /// <returns>The updated job DTO.</returns>
     [HttpPost("{id}/queue")]
     [RequirePermission(JobPermissions.JobsWrite)]
     public async Task<ActionResult<JobDto>> Queue(Guid id, [FromBody] QueueJobRequest request)
@@ -161,6 +179,8 @@ public class JobController : ControllerBase
     /// <summary>
     /// Starts production for a job.
     /// </summary>
+    /// <param name="id">The job ID.</param>
+    /// <returns>The updated job DTO.</returns>
     [HttpPost("{id}/start")]
     [RequirePermission(JobPermissions.JobsWrite)]
     public async Task<ActionResult<JobDto>> Start(Guid id)
@@ -180,16 +200,28 @@ public class JobController : ControllerBase
         job.StartedAt = DateTime.UtcNow;
         job.UpdatedAt = DateTime.UtcNow;
         
-        await _publishEndpoint.Publish(new JobStartedEvent
-        {
-            JobId = job.Id,
-            OrderId = job.OrderId,
-            MaterialId = job.MaterialId,
-            VolumeCm3 = job.VolumeCm3,
-            Technology = job.Technology,
-            AssignedMachineId = job.AssignedMachineId ?? string.Empty,
-            StartedAt = job.StartedAt.Value
-        });
+        await _publishEndpoint.Publish(new JobStartedEvent(
+            MessageId: Guid.NewGuid(),
+            MessageName: nameof(JobStartedEvent),
+            MessageType: Maliev.MessagingContracts.Generated.MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy: "job-service",
+            ConsumedBy: Array.Empty<string>(),
+            CorrelationId: Guid.NewGuid(),
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
+            Payload: new JobStartedEventPayload
+            {
+                JobId = job.Id,
+                OrderId = job.OrderId,
+                MaterialId = job.MaterialId,
+                VolumeCm3 = (double)job.VolumeCm3,
+                Technology = job.Technology,
+                AssignedMachineId = job.AssignedMachineId ?? string.Empty,
+                StartedAt = job.StartedAt.Value
+            }
+        ));
         await PublishJobStatusChangedAsync(job, previousStatus);
         await _dbContext.SaveChangesAsync();
         
@@ -202,6 +234,8 @@ public class JobController : ControllerBase
     /// <summary>
     /// Moves a job to the finishing stage.
     /// </summary>
+    /// <param name="id">The job ID.</param>
+    /// <returns>The updated job DTO.</returns>
     [HttpPost("{id}/finish")]
     [RequirePermission(JobPermissions.JobsWrite)]
     public async Task<ActionResult<JobDto>> Finish(Guid id)
@@ -232,6 +266,8 @@ public class JobController : ControllerBase
     /// <summary>
     /// Completes a job.
     /// </summary>
+    /// <param name="id">The job ID.</param>
+    /// <returns>The updated job DTO.</returns>
     [HttpPost("{id}/complete")]
     [RequirePermission(JobPermissions.JobsWrite)]
     public async Task<ActionResult<JobDto>> Complete(Guid id)
@@ -263,6 +299,9 @@ public class JobController : ControllerBase
     /// <summary>
     /// Cancels a job.
     /// </summary>
+    /// <param name="id">The job ID.</param>
+    /// <param name="request">The cancellation request containing the reason.</param>
+    /// <returns>The updated job DTO.</returns>
     [HttpPost("{id}/cancel")]
     [RequirePermission(JobPermissions.JobsWrite)]
     public async Task<ActionResult<JobDto>> Cancel(Guid id, [FromBody] CancelJobRequest request)
@@ -290,6 +329,9 @@ public class JobController : ControllerBase
     /// <summary>
     /// Reassigns a queued job to a different machine.
     /// </summary>
+    /// <param name="id">The job ID.</param>
+    /// <param name="request">The reassignment request containing the new machine ID.</param>
+    /// <returns>The updated job DTO.</returns>
     [HttpPatch("{id}/reassign")]
     [RequirePermission(JobPermissions.JobsWrite)]
     public async Task<ActionResult<JobDto>> Reassign(Guid id, [FromBody] ReassignJobRequest request)
@@ -313,17 +355,18 @@ public class JobController : ControllerBase
 
     private static (bool Valid, string Error) ValidateTransition(JobStatus currentStatus, string action)
     {
-        var validTransitions = new Dictionary<JobStatus, HashSet<string>>
+        bool isValid = currentStatus switch
         {
-            [JobStatus.Pending] = new() { "queue", "start", "cancel" },
-            [JobStatus.Queued] = new() { "start", "reassign", "cancel" },
-            [JobStatus.InProgress] = new() { "finish", "cancel" },
-            [JobStatus.Finishing] = new() { "complete", "cancel" },
-            [JobStatus.Completed] = new() { "cancel" },
-            [JobStatus.Cancelled] = new()
+            JobStatus.Pending => action is "queue" or "start" or "cancel",
+            JobStatus.Queued => action is "start" or "reassign" or "cancel",
+            JobStatus.InProgress => action is "finish" or "cancel",
+            JobStatus.Finishing => action is "complete" or "cancel",
+            JobStatus.Completed => action is "cancel",
+            JobStatus.Cancelled => false,
+            _ => false
         };
         
-        if (validTransitions.TryGetValue(currentStatus, out var allowedActions) && allowedActions.Contains(action))
+        if (isValid)
             return (true, string.Empty);
         
         return (false, $"Cannot {action} a job in {currentStatus} status");
@@ -339,16 +382,28 @@ public class JobController : ControllerBase
 
     private async Task PublishJobStatusChangedAsync(Job job, JobStatus previousStatus)
     {
-        await _publishEndpoint.Publish(new JobStatusChangedEvent
-        {
-            JobId = job.Id,
-            OrderId = job.OrderId,
-            PreviousStatus = previousStatus.ToString(),
-            NewStatus = job.Status.ToString(),
-            Technology = job.Technology,
-            AssignedMachineId = job.AssignedMachineId,
-            ChangedAt = DateTime.UtcNow,
-            ChangedBy = GetCurrentUserId()
-        });
+        await _publishEndpoint.Publish(new JobStatusChangedEvent(
+            MessageId: Guid.NewGuid(),
+            MessageName: nameof(JobStatusChangedEvent),
+            MessageType: Maliev.MessagingContracts.Generated.MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy: "job-service",
+            ConsumedBy: Array.Empty<string>(),
+            CorrelationId: Guid.NewGuid(),
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
+            Payload: new JobStatusChangedEventPayload
+            {
+                JobId = job.Id,
+                OrderId = job.OrderId,
+                PreviousStatus = previousStatus.ToString(),
+                NewStatus = job.Status.ToString(),
+                Technology = job.Technology,
+                AssignedMachineId = job.AssignedMachineId,
+                ChangedAt = DateTime.UtcNow,
+                ChangedBy = GetCurrentUserId()
+            }
+        ));
     }
 }
