@@ -3,6 +3,7 @@ using Maliev.JobService.Api.Clients;
 using Maliev.JobService.Api.Metrics;
 using Maliev.JobService.Data;
 using Maliev.JobService.Data.Entities;
+using Maliev.MessagingContracts.Contracts.Orders;
 using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.JobService.Api.Consumers;
@@ -39,7 +40,7 @@ public class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
     /// <inheritdoc />
     public async Task Consume(ConsumeContext<OrderPaidEvent> context)
     {
-        var orderId = context.Message.OrderId;
+        var orderId = context.Message.Payload.OrderId;
         
         _logger.LogInformation("Processing OrderPaidEvent for OrderId: {OrderId}", orderId);
         
@@ -108,13 +109,3 @@ public class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
     }
 }
 
-/// <summary>
-/// Event published when an order is paid.
-/// </summary>
-public interface OrderPaidEvent
-{
-    /// <summary>
-    /// Gets the unique identifier of the paid order.
-    /// </summary>
-    Guid OrderId { get; }
-}
