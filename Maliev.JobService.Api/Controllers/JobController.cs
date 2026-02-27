@@ -203,7 +203,7 @@ public class JobController : ControllerBase
         await _publishEndpoint.Publish(new JobStartedEvent(
             MessageId: Guid.NewGuid(),
             MessageName: nameof(JobStartedEvent),
-            MessageType: Maliev.MessagingContracts.Generated.MessageType.Event,
+            MessageType: Maliev.MessagingContracts.MessageType.Event,
             MessageVersion: "1.0.0",
             PublishedBy: "job-service",
             ConsumedBy: Array.Empty<string>(),
@@ -385,7 +385,7 @@ public class JobController : ControllerBase
         await _publishEndpoint.Publish(new JobStatusChangedEvent(
             MessageId: Guid.NewGuid(),
             MessageName: nameof(JobStatusChangedEvent),
-            MessageType: Maliev.MessagingContracts.Generated.MessageType.Event,
+            MessageType: Maliev.MessagingContracts.MessageType.Event,
             MessageVersion: "1.0.0",
             PublishedBy: "job-service",
             ConsumedBy: Array.Empty<string>(),
