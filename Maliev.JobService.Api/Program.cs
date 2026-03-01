@@ -1,8 +1,10 @@
-using Maliev.JobService.Api.Clients;
 using Maliev.JobService.Api.Consumers;
-using Maliev.JobService.Api.Metrics;
+using Maliev.JobService.Application.Abstractions;
 using Maliev.JobService.Api.Services;
-using Maliev.JobService.Data;
+using Maliev.JobService.Domain.Clients;
+using Maliev.JobService.Infrastructure.Metrics;
+using Maliev.JobService.Infrastructure.Persistence;
+using Maliev.JobService.Infrastructure.Services;
 
 // Initialize bootstrap logging
 using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
@@ -19,6 +21,7 @@ try
 
     // --- Infrastructure & Observability ---
     builder.AddServiceDefaults();
+    builder.AddDefaultApiVersioning();
     builder.AddStandardMiddleware();
     builder.AddServiceMeters("job-meter");
 
@@ -41,11 +44,10 @@ try
     builder.Services.AddIAMRegistration<JobIAMRegistrationService>("job");
 
     // Authenticated HTTP client for OrderService calls
-    builder.AddAuthenticatedServiceClient<IOrderServiceClient, OrderServiceClient>("OrderService", sourceServiceName: "JobService");
+    builder.AddAuthenticatedServiceClient<IOrderServiceClient, Maliev.JobService.Infrastructure.HttpClients.OrderServiceClient>("OrderService", sourceServiceName: "JobService");
 
     // --- API Configuration ---
     builder.AddStandardCors();
-    builder.AddDefaultApiVersioning();
 
     if (!builder.Environment.IsProduction())
     {
@@ -61,6 +63,7 @@ try
     });
 
     builder.Services.AddSingleton<JobMetrics>();
+    builder.Services.AddScoped<IJobService, JobService>();
 
     builder.Services.AddControllers();
 

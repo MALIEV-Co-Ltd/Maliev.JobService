@@ -22,6 +22,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Maliev.JobService.Api\Maliev.JobService.Api.csproj" />
-    <ProjectReference Include="..\Maliev.JobService.Data\Maliev.JobService.Data.csproj" />
+    <ProjectReference Include="..\Maliev.JobService.Domain\Maliev.JobService.Domain.csproj" />
+    <ProjectReference Include="..\Maliev.JobService.Infrastructure\Maliev.JobService.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

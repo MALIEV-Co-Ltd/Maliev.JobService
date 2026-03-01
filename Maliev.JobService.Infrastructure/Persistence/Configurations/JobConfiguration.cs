@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Maliev.JobService.Data.Entities;
+using Maliev.JobService.Domain.Entities;
 
-namespace Maliev.JobService.Data.Configurations;
+namespace Maliev.JobService.Infrastructure.Persistence.Configurations;
 
 /// <summary>
 /// Entity Framework configuration for the <see cref="Job"/> entity.

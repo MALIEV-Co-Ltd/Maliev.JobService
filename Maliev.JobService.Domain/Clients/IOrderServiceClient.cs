@@ -1,4 +1,6 @@
-namespace Maliev.JobService.Api.Clients;
+using Maliev.JobService.Domain.Models;
+
+namespace Maliev.JobService.Domain.Clients;
 
 /// <summary>
 /// Client for interacting with the Order Service.
@@ -11,7 +13,7 @@ public interface IOrderServiceClient
     /// <param name="orderId">The unique identifier of the order.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>A list of order items.</returns>
-    Task<List<DTOs.OrderItemDto>> GetOrderItemsAsync(Guid orderId, CancellationToken cancellationToken = default);
+    Task<List<OrderItemDto>> GetOrderItemsAsync(Guid orderId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets the delivery date for a specific order.

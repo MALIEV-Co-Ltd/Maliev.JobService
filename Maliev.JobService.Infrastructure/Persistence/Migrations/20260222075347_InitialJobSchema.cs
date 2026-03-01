@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace Maliev.JobService.Data.Migrations
+namespace Maliev.JobService.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
     public partial class InitialJobSchema : Migration

@@ -1,0 +1,20 @@
+namespace Maliev.JobService.Domain.Models;
+
+/// <summary>
+/// Data transfer object for an order item received from the Order Service.
+/// </summary>
+public record OrderItemDto
+{
+    /// <summary>Gets the unique identifier of the order item.</summary>
+    public required Guid OrderItemId { get; init; }
+    /// <summary>Gets the unique identifier of the material.</summary>
+    public required Guid MaterialId { get; init; }
+    /// <summary>Gets the manufacturing technology.</summary>
+    public required string Technology { get; init; }
+    /// <summary>Gets the part volume in cubic centimeters.</summary>
+    public decimal VolumeCm3 { get; init; }
+    /// <summary>Gets the estimated print time in minutes.</summary>
+    public int EstimatedPrintTimeMinutes { get; init; }
+    /// <summary>Gets the scheduled delivery date.</summary>
+    public DateTime? DeliveryDate { get; init; }
+}

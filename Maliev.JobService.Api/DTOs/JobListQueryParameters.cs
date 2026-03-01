@@ -1,4 +1,4 @@
-using Maliev.JobService.Data.Entities;
+using Maliev.JobService.Domain.Entities;
 
 namespace Maliev.JobService.Api.DTOs;
 

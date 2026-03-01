@@ -1,8 +1,10 @@
 using System.Net;
 using System.Text.Json;
-using Maliev.JobService.Api.DTOs;
+using Maliev.JobService.Domain.Clients;
+using Maliev.JobService.Domain.Models;
+using Microsoft.Extensions.Logging;
 
-namespace Maliev.JobService.Api.Clients;
+namespace Maliev.JobService.Infrastructure.HttpClients;
 
 /// <summary>
 /// Implementation of the order service client.

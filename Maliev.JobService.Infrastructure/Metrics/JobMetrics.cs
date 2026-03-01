@@ -1,10 +1,10 @@
 using System.Diagnostics.Metrics;
-using Maliev.JobService.Data.Entities;
+using Maliev.JobService.Domain.Entities;
 
-namespace Maliev.JobService.Api.Metrics;
+namespace Maliev.JobService.Infrastructure.Metrics;
 
 /// <summary>
-/// Metrics collector for the job service.
+/// Collects Prometheus/OpenTelemetry metrics for job operations.
 /// </summary>
 public class JobMetrics
 {
@@ -19,39 +19,40 @@ public class JobMetrics
     public JobMetrics(IMeterFactory meterFactory)
     {
         var meter = meterFactory.Create("Maliev.JobService");
-        
+
         _jobsCreatedCounter = meter.CreateCounter<long>("jobs_created_total", "count", "Total number of jobs created");
         _transitionDurationHistogram = meter.CreateHistogram<double>("job_transition_duration_seconds", "seconds", "Duration of job status transitions");
         _jobsByStatusCounter = meter.CreateCounter<long>("jobs_by_status", "count", "Jobs count by status");
     }
 
     /// <summary>
-    /// Records the creation of new jobs.
+    /// Records job creation count.
     /// </summary>
-    /// <param name="count">The number of jobs created.</param>
+    /// <param name="count">The number of created jobs.</param>
     public void RecordJobCreated(int count = 1)
     {
         _jobsCreatedCounter.Add(count);
     }
 
     /// <summary>
-    /// Records a job status transition.
+    /// Records a job state transition duration.
     /// </summary>
-    /// <param name="fromStatus">The source status.</param>
-    /// <param name="toStatus">The target status.</param>
-    /// <param name="duration">The duration of the transition.</param>
+    /// <param name="fromStatus">The previous status.</param>
+    /// <param name="toStatus">The new status.</param>
+    /// <param name="duration">The transition duration.</param>
     public void RecordTransition(string fromStatus, string toStatus, TimeSpan duration)
     {
-        _transitionDurationHistogram.Record(duration.TotalSeconds, 
+        _transitionDurationHistogram.Record(
+            duration.TotalSeconds,
             new KeyValuePair<string, object?>("from_status", fromStatus),
             new KeyValuePair<string, object?>("to_status", toStatus));
     }
 
     /// <summary>
-    /// Records the current count of jobs by status.
+    /// Records observed job count for a status.
     /// </summary>
     /// <param name="status">The job status.</param>
-    /// <param name="count">The count.</param>
+    /// <param name="count">The count value.</param>
     public void RecordJobsByStatus(JobStatus status, int count)
     {
         _jobsByStatusCounter.Add(count, new KeyValuePair<string, object?>("status", status.ToString()));

@@ -12,7 +12,8 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\Maliev.JobService.Data\Maliev.JobService.Data.csproj" />
+		<ProjectReference Include="..\Maliev.JobService.Application\Maliev.JobService.Application.csproj" />
+		<ProjectReference Include="..\Maliev.JobService.Infrastructure\Maliev.JobService.Infrastructure.csproj" />
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(GITHUB_ACTIONS)' != 'true'">

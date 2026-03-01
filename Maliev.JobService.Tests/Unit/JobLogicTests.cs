@@ -1,4 +1,4 @@
-using Maliev.JobService.Data.Entities;
+using Maliev.JobService.Domain.Entities;
 using Xunit;
 
 namespace Maliev.JobService.Tests.Unit;
