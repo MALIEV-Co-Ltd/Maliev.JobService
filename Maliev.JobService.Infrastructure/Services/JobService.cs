@@ -12,6 +12,27 @@ using Microsoft.Extensions.Logging;
 namespace Maliev.JobService.Infrastructure.Services;
 
 /// <summary>
+/// Constants for the JobService implementation.
+/// </summary>
+public static class JobServiceConstants
+{
+    /// <summary>
+    /// Maximum page size for paginated queries.
+    /// </summary>
+    public const int MaxPageSize = 100;
+
+    /// <summary>
+    /// Number of days to look back for recent jobs in Kanban view.
+    /// </summary>
+    public const int RecentDaysThreshold = 7;
+
+    /// <summary>
+    /// Default priority value when no delivery date is specified.
+    /// </summary>
+    public const int DefaultPriorityForNoDelivery = 999;
+}
+
+/// <summary>
 /// Default implementation of <see cref="IJobService"/>.
 /// </summary>
 public class JobService : IJobService
@@ -60,7 +81,7 @@ public class JobService : IJobService
         CancellationToken cancellationToken = default)
     {
         var safePage = Math.Max(1, page);
-        var safePageSize = Math.Clamp(pageSize, 1, 100);
+        var safePageSize = Math.Clamp(pageSize, 1, JobServiceConstants.MaxPageSize);
 
         var query = _dbContext.Jobs.AsNoTracking();
 
@@ -101,7 +122,7 @@ public class JobService : IJobService
     /// <inheritdoc />
     public async Task<IReadOnlyList<Job>> GetKanbanJobsAsync(CancellationToken cancellationToken = default)
     {
-        var recentThreshold = DateTime.UtcNow.AddDays(-7);
+        var recentThreshold = DateTime.UtcNow.AddDays(-JobServiceConstants.RecentDaysThreshold);
 
         return await _dbContext.Jobs
             .AsNoTracking()
@@ -136,8 +157,8 @@ public class JobService : IJobService
         job.AssignedMachineId = machineId;
         job.UpdatedAt = DateTime.UtcNow;
 
-        await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
 
         _metrics.RecordTransition(previousStatus.ToString(), job.Status.ToString(), DateTime.UtcNow - transitionStart);
         _logger.LogInformation("Job {JobId} queued on machine {MachineId}", job.Id, machineId);
@@ -167,6 +188,7 @@ public class JobService : IJobService
         job.StartedAt = DateTime.UtcNow;
         job.UpdatedAt = DateTime.UtcNow;
 
+        await _dbContext.SaveChangesAsync(cancellationToken);
         await _publishEndpoint.Publish(new JobStartedEvent(
             MessageId: Guid.NewGuid(),
             MessageName: nameof(JobStartedEvent),
@@ -190,7 +212,6 @@ public class JobService : IJobService
             }), cancellationToken);
 
         await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
 
         _metrics.RecordTransition(previousStatus.ToString(), job.Status.ToString(), DateTime.UtcNow - transitionStart);
         _logger.LogInformation("Job {JobId} started at {StartedAt}", job.Id, job.StartedAt);
@@ -219,8 +240,8 @@ public class JobService : IJobService
         job.Status = JobStatus.Finishing;
         job.UpdatedAt = DateTime.UtcNow;
 
-        await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
 
         _metrics.RecordTransition(previousStatus.ToString(), job.Status.ToString(), DateTime.UtcNow - transitionStart);
         _logger.LogInformation("Job {JobId} moved to finishing", job.Id);
@@ -250,8 +271,8 @@ public class JobService : IJobService
         job.CompletedAt = DateTime.UtcNow;
         job.UpdatedAt = DateTime.UtcNow;
 
-        await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
 
         _metrics.RecordTransition(previousStatus.ToString(), job.Status.ToString(), DateTime.UtcNow - transitionStart);
         _logger.LogInformation("Job {JobId} completed at {CompletedAt}", job.Id, job.CompletedAt);
@@ -279,8 +300,8 @@ public class JobService : IJobService
         job.Notes = reason;
         job.UpdatedAt = DateTime.UtcNow;
 
-        await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
 
         _metrics.RecordTransition(previousStatus.ToString(), job.Status.ToString(), DateTime.UtcNow - transitionStart);
         _logger.LogInformation("Job {JobId} cancelled with reason: {Reason}", job.Id, reason);
@@ -372,7 +393,7 @@ public class JobService : IJobService
     {
         if (!deliveryDate.HasValue)
         {
-            return 999;
+            return JobServiceConstants.DefaultPriorityForNoDelivery;
         }
 
         var daysRemaining = (deliveryDate.Value - DateTime.UtcNow).Days;

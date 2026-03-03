@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.Extensions.Configuration;
 
 namespace Maliev.JobService.Infrastructure.Persistence;
 
@@ -12,7 +13,16 @@ public class JobDbContextFactory : IDesignTimeDbContextFactory<JobDbContext>
     public JobDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<JobDbContext>();
-        optionsBuilder.UseNpgsql("Host=localhost;Database=jobservice;Username=postgres;Password=postgres");
+
+        var configuration = new ConfigurationBuilder()
+            .AddJsonFile("appsettings.json", optional: true)
+            .AddEnvironmentVariables()
+            .Build();
+
+        var connectionString = configuration.GetConnectionString("JobDbContext")
+            ?? "Host=localhost;Database=jobservice;Username=postgres;Password=postgres";
+
+        optionsBuilder.UseNpgsql(connectionString);
         return new JobDbContext(optionsBuilder.Options);
     }
 }
