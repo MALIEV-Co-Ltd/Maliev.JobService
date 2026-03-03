@@ -4,6 +4,7 @@ using Maliev.JobService.Domain.Clients;
 using Maliev.JobService.Domain.Entities;
 using Maliev.JobService.Infrastructure.Metrics;
 using Maliev.JobService.Infrastructure.Persistence;
+using Maliev.MessagingContracts;
 using Maliev.MessagingContracts.Contracts.Jobs;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
@@ -192,7 +193,7 @@ public class JobService : IJobService
         await _publishEndpoint.Publish(new JobStartedEvent(
             MessageId: Guid.NewGuid(),
             MessageName: nameof(JobStartedEvent),
-            MessageType: Maliev.MessagingContracts.MessageType.Event,
+            MessageType: MessageType.Event,
             MessageVersion: "1.0.0",
             PublishedBy: "job-service",
             ConsumedBy: Array.Empty<string>(),
@@ -430,7 +431,7 @@ public class JobService : IJobService
         await _publishEndpoint.Publish(new JobStatusChangedEvent(
             MessageId: Guid.NewGuid(),
             MessageName: nameof(JobStatusChangedEvent),
-            MessageType: Maliev.MessagingContracts.MessageType.Event,
+            MessageType: MessageType.Event,
             MessageVersion: "1.0.0",
             PublishedBy: "job-service",
             ConsumedBy: Array.Empty<string>(),
