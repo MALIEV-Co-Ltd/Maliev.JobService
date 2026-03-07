@@ -53,9 +53,9 @@ dotnet test                               # Run all tests
 ### EF Core
 
 ```bash
-dotnet ef migrations add <Name> --project Maliev.JobService.Data --startup-project Maliev.JobService.Api
-dotnet ef database update --project Maliev.JobService.Data --startup-project Maliev.JobService.Api
-dotnet ef database drop --force --project Maliev.JobService.Data --startup-project Maliev.JobService.Api
+dotnet ef migrations add <Name> --project Maliev.JobService.Infrastructure --startup-project Maliev.JobService.Infrastructure
+dotnet ef database update --project Maliev.JobService.Infrastructure --startup-project Maliev.JobService.Infrastructure
+dotnet ef database drop --force --project Maliev.JobService.Infrastructure --startup-project Maliev.JobService.Infrastructure
 ```
 
 ### Docker Infrastructure

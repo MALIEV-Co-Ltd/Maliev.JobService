@@ -1,4 +1,4 @@
-namespace Maliev.JobService.Data.Entities;
+namespace Maliev.JobService.Domain.Entities;
 
 /// <summary>
 /// Defines the possible states of a manufacturing job.

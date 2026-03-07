@@ -1,4 +1,4 @@
-namespace Maliev.JobService.Data.Entities;
+namespace Maliev.JobService.Domain.Entities;
 
 /// <summary>
 /// Represents a manufacturing job on the shop floor.

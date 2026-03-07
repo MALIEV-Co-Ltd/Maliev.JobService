@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Maliev.JobService.Data.Entities;
+using Maliev.JobService.Domain.Entities;
 
-namespace Maliev.JobService.Data.Configurations;
+namespace Maliev.JobService.Infrastructure.Persistence.Configurations;
 
 /// <summary>
 /// Entity Framework configuration for the <see cref="Job"/> entity.
@@ -42,5 +42,10 @@ public class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.HasIndex(j => new { j.OrderId, j.OrderItemId })
             .IsUnique()
             .HasDatabaseName("IX_Jobs_OrderId_OrderItemId");
+
+        builder.Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
     }
 }

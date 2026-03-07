@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using Maliev.JobService.Data.Configurations;
-using Maliev.JobService.Data.Entities;
+using Maliev.JobService.Infrastructure.Persistence.Configurations;
+using Maliev.JobService.Domain.Entities;
 
-namespace Maliev.JobService.Data;
+namespace Maliev.JobService.Infrastructure.Persistence;
 
 /// <summary>
 /// Database context for the Job Service.
