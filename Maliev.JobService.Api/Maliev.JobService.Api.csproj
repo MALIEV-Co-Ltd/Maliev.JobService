@@ -11,7 +11,7 @@
 		<SharedLibraryVersion Condition="'$(SharedLibraryVersion)' == ''">1.0.*-*</SharedLibraryVersion>
 	</PropertyGroup>
 
-	<ItemGroup>
+<ItemGroup>
 		<ProjectReference Include="..\Maliev.JobService.Application\Maliev.JobService.Application.csproj" />
 		<ProjectReference Include="..\Maliev.JobService.Infrastructure\Maliev.JobService.Infrastructure.csproj" />
 	</ItemGroup>

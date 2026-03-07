@@ -233,7 +233,7 @@ public class JobServiceIntegrationTests : IAsyncLifetime
                 Technology = "FDM",
                 VolumeCm3 = 100,
                 EstimatedPrintTimeMinutes = 120,
-                DeliveryDate = DateTime.UtcNow.AddDays(10).Date.AddHours(12),
+                DeliveryDate = DateTime.UtcNow.AddDays(10).AddHours(12),
             },
         };
 

@@ -73,7 +73,7 @@ public class JobLogicTests
         if (!deliveryDate.HasValue)
             return 999;
             
-        var daysRemaining = (deliveryDate.Value - DateTime.UtcNow).Days;
-        return Math.Max(0, daysRemaining);
+        var daysRemaining = (deliveryDate.Value - DateTime.UtcNow).TotalDays;
+        return Math.Max(0, (int)Math.Floor(daysRemaining));
     }
 }

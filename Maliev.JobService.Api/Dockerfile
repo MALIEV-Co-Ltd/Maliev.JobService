@@ -11,7 +11,9 @@ WORKDIR /src
 
 COPY ["nuget.config", "."]
 COPY ["Maliev.JobService.Api/Maliev.JobService.Api.csproj", "Maliev.JobService.Api/"]
-COPY ["Maliev.JobService.Data/Maliev.JobService.Data.csproj", "Maliev.JobService.Data/"]
+COPY ["Maliev.JobService.Application/Maliev.JobService.Application.csproj", "Maliev.JobService.Application/"]
+COPY ["Maliev.JobService.Domain/Maliev.JobService.Domain.csproj", "Maliev.JobService.Domain/"]
+COPY ["Maliev.JobService.Infrastructure/Maliev.JobService.Infrastructure.csproj", "Maliev.JobService.Infrastructure/"]
 
 RUN --mount=type=secret,id=nuget_username \
     --mount=type=secret,id=nuget_password \

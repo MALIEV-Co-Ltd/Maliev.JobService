@@ -30,8 +30,8 @@ This document contains instructions for AI agents operating in this repository.
 - **Test (All)**: `dotnet test`
 - **Test (Single)**: `dotnet test --filter "FullyQualifiedName~Namespace.ClassName.MethodName"`
 - **Run API**: `dotnet run --project Maliev.JobService.Api`
-- **Database Migrations**: `dotnet ef migrations add <MigrationName> --project Maliev.JobService.Infrastructure --startup-project Maliev.JobService.Api`
-- **Database Update**: `dotnet ef database update --project Maliev.JobService.Infrastructure --startup-project Maliev.JobService.Api`
+- **Database Migrations**: `dotnet ef migrations add <MigrationName> --project Maliev.JobService.Infrastructure --startup-project Maliev.JobService.Infrastructure`
+- **Database Update**: `dotnet ef database update --project Maliev.JobService.Infrastructure --startup-project Maliev.JobService.Infrastructure`
 
 ## 3. Code Style & Conventions
 
@@ -109,9 +109,9 @@ The "single QR per job + confirmation tap" pattern:
 ### EF Core Design Package
 - ❌ `Microsoft.EntityFrameworkCore.Design` MUST NOT be in Api projects
 - ✅ It belongs ONLY in the Infrastructure (or Data) project where migrations live
-- Migration commands must target Infrastructure, not Api:
+- Migration commands must target Infrastructure as both project and startup-project (since EF Core Design package is in Infrastructure):
   ```
-  dotnet ef migrations add <Name> --project Maliev.<Domain>Service.Infrastructure --startup-project ../Maliev.<Domain>Service.Api
+  dotnet ef migrations add <Name> --project Maliev.<Domain>Service.Infrastructure --startup-project Maliev.<Domain>Service.Infrastructure
   ```
 
 ### PostgreSQL xmin Concurrency — Mandatory Pattern

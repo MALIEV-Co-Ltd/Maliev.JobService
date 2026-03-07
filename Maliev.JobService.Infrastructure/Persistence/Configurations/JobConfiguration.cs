@@ -42,5 +42,10 @@ public class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.HasIndex(j => new { j.OrderId, j.OrderItemId })
             .IsUnique()
             .HasDatabaseName("IX_Jobs_OrderId_OrderItemId");
+
+        builder.Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
     }
 }

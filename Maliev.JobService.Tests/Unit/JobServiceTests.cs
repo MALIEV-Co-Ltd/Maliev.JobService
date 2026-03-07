@@ -565,7 +565,7 @@ public class JobServiceTests : IAsyncLifetime
     public async Task CreateJobsForPaidOrderAsync_CalculatesPriority()
     {
         var orderId = Guid.NewGuid();
-        var deliveryDate = DateTime.UtcNow.AddDays(10).Date.AddHours(12);
+        var deliveryDate = DateTime.UtcNow.AddDays(10).AddHours(12);
         var orderItems = new List<OrderItemDto>
         {
             new()
