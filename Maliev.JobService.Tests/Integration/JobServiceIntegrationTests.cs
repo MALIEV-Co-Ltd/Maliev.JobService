@@ -18,7 +18,7 @@ namespace Maliev.JobService.Tests.Integration;
 public class JobServiceIntegrationTests : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = 
-                #pragma warning disable CS0618
+#pragma warning disable CS0618
         new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
         .WithDatabase("jobdb")
