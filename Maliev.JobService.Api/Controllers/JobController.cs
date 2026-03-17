@@ -13,7 +13,7 @@ namespace Maliev.JobService.Api.Controllers;
 /// Controller for managing manufacturing jobs.
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("job/v{version:apiVersion}/jobs")]
 [RequirePermission(JobPermissions.JobsRead)]
 public class JobController : ControllerBase
