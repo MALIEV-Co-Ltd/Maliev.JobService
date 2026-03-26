@@ -1,6 +1,6 @@
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
-using Maliev.JobService.Api.Authorization;
+using Maliev.JobService.Application.Authorization;
 using Maliev.JobService.Api.DTOs;
 using Maliev.JobService.Application.Abstractions;
 using Maliev.JobService.Domain.Entities;
@@ -109,6 +109,23 @@ public class JobController : ControllerBase
 
         _logger.LogInformation("Retrieved Kanban view with {Total} total jobs", jobs.Count);
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Gets the queue depth (number of active jobs) by technology.
+    /// </summary>
+    /// <param name="technology">Optional technology filter (e.g., FDM, SLA, CNC).</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>A dictionary of technology to active job count.</returns>
+    [HttpGet("queue-depth")]
+    [RequirePermission(JobPermissions.JobsRead)]
+    public async Task<ActionResult<Dictionary<string, int>>> GetQueueDepth(
+        [FromQuery] string? technology,
+        CancellationToken cancellationToken)
+    {
+        var result = await _jobService.GetQueueDepthByTechnologyAsync(technology, cancellationToken);
+        _logger.LogInformation("Retrieved queue depth for {Technology}: {Count}", technology ?? "all technologies", result.Count);
+        return Ok(result);
     }
 
     /// <summary>

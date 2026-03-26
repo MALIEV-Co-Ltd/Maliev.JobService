@@ -1,5 +1,5 @@
 using Maliev.Aspire.ServiceDefaults.IAM;
-using Maliev.JobService.Api.Authorization;
+using Maliev.JobService.Application.Authorization;
 
 namespace Maliev.JobService.Api.Services;
 

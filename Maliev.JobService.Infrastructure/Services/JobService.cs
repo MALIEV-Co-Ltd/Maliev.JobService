@@ -390,6 +390,28 @@ public class JobService : IJobService
         return orderItems.Count;
     }
 
+    /// <inheritdoc />
+    public async Task<Dictionary<string, int>> GetQueueDepthByTechnologyAsync(string? technology, CancellationToken cancellationToken = default)
+    {
+        var activeStatuses = new[] { JobStatus.Queued, JobStatus.InProgress };
+
+        var query = _dbContext.Jobs
+            .AsNoTracking()
+            .Where(j => activeStatuses.Contains(j.Status));
+
+        if (!string.IsNullOrWhiteSpace(technology))
+        {
+            query = query.Where(j => j.Technology == technology);
+        }
+
+        var result = await query
+            .GroupBy(j => j.Technology)
+            .Select(g => new { Technology = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        return result.ToDictionary(r => r.Technology, r => r.Count);
+    }
+
     private static int CalculatePriority(DateTime? deliveryDate)
     {
         if (!deliveryDate.HasValue)

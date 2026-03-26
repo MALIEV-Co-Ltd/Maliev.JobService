@@ -1,4 +1,4 @@
-namespace Maliev.JobService.Domain.Entities;
+﻿namespace Maliev.JobService.Domain.Entities;
 
 /// <summary>
 /// Represents a manufacturing job on the shop floor.
@@ -69,6 +69,28 @@ public class Job
     /// Gets or sets the timestamp when the job was completed.
     /// </summary>
     public DateTime? CompletedAt { get; set; }
+
+    /// <summary>
+    /// Gets or sets the scheduled start time for this job (UTC).
+    /// Null until job is queued and scheduled.
+    /// </summary>
+    public DateTime? ScheduledStartTime { get; set; }
+
+    /// <summary>
+    /// Gets or sets the estimated end time based on ScheduledStartTime + duration + setup.
+    /// </summary>
+    public DateTime? ScheduledEndTime { get; set; }
+
+    /// <summary>
+    /// Gets or sets the setup time in minutes required before this job can run.
+    /// </summary>
+    public int SetupTimeMinutes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the position in the queue for jobs of same technology/machine.
+    /// Lower = earlier in queue. Zero if not queued.
+    /// </summary>
+    public int QueuePosition { get; set; }
 
     /// <summary>
     /// Gets or sets the timestamp when the record was created.

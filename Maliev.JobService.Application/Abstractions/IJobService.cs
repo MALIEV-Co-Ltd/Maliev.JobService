@@ -112,4 +112,12 @@ public interface IJobService
     /// <param name="cancellationToken">A token used to cancel the operation.</param>
     /// <returns>The number of created jobs.</returns>
     Task<int> CreateJobsForPaidOrderAsync(Guid orderId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the queue depth (number of active jobs) by technology.
+    /// </summary>
+    /// <param name="technology">The manufacturing technology filter (e.g., FDM, SLA, CNC).</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>A dictionary with technology as key and count of active (Queued + InProgress) jobs as value.</returns>
+    Task<Dictionary<string, int>> GetQueueDepthByTechnologyAsync(string? technology, CancellationToken cancellationToken = default);
 }
