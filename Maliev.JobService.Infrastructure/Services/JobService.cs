@@ -412,6 +412,37 @@ public class JobService : IJobService
         return result.ToDictionary(r => r.Technology, r => r.Count);
     }
 
+    /// <inheritdoc />
+    public async Task<int> UpdateOutsourcingStatusAsync(Guid orderId, bool isOutsourced, CancellationToken cancellationToken = default)
+    {
+        var jobs = await _dbContext.Jobs
+            .Where(j => j.OrderId == orderId)
+            .ToListAsync(cancellationToken);
+
+        if (jobs.Count == 0)
+        {
+            _logger.LogInformation("No jobs found for OrderId: {OrderId} to update outsourcing status", orderId);
+            return 0;
+        }
+
+        var now = DateTime.UtcNow;
+        foreach (var job in jobs)
+        {
+            job.IsOutsourced = isOutsourced;
+            job.UpdatedAt = now;
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Updated outsourcing status to {IsOutsourced} for {Count} jobs on OrderId: {OrderId}",
+            isOutsourced,
+            jobs.Count,
+            orderId);
+
+        return jobs.Count;
+    }
+
     private static int CalculatePriority(DateTime? deliveryDate)
     {
         if (!deliveryDate.HasValue)

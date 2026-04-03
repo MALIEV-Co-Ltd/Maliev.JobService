@@ -120,4 +120,13 @@ public interface IJobService
     /// <param name="cancellationToken">A token used to cancel the operation.</param>
     /// <returns>A dictionary with technology as key and count of active (Queued + InProgress) jobs as value.</returns>
     Task<Dictionary<string, int>> GetQueueDepthByTechnologyAsync(string? technology, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates the outsourcing status of all jobs belonging to a given order.
+    /// </summary>
+    /// <param name="orderId">The order identifier.</param>
+    /// <param name="isOutsourced">The new outsourcing state.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The number of jobs updated.</returns>
+    Task<int> UpdateOutsourcingStatusAsync(Guid orderId, bool isOutsourced, CancellationToken cancellationToken = default);
 }

@@ -34,6 +34,7 @@ try
     builder.AddMassTransitWithRabbitMq(configure: x =>
     {
         x.AddConsumer<OrderPaidEventConsumer>();
+        x.AddConsumer<OrderOutsourcingChangedConsumer>();
     });
 
     // JWT Authentication (also registers AddPermissionAuthorization internally)

@@ -25,6 +25,8 @@ public record KanbanJobDto
     public DateTime? StartedAt { get; init; }
     /// <summary>Gets the timestamp when production was completed.</summary>
     public DateTime? CompletedAt { get; init; }
+    /// <summary>Employee-only. True if job is outsourced.</summary>
+    public bool IsOutsourced { get; init; }
 
     /// <summary>
     /// Maps a Job entity to a KanbanJobDto.
@@ -41,6 +43,7 @@ public record KanbanJobDto
         Priority = job.Priority,
         EstimatedPrintTimeMinutes = job.EstimatedPrintTimeMinutes,
         StartedAt = job.StartedAt,
-        CompletedAt = job.CompletedAt
+        CompletedAt = job.CompletedAt,
+        IsOutsourced = job.IsOutsourced
     };
 }

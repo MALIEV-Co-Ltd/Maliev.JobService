@@ -93,6 +93,11 @@ public class JobConfiguration : IEntityTypeConfiguration<Job>
             .HasColumnName("updated_at")
             .IsRequired();
 
+        builder.Property(j => j.IsOutsourced)
+            .HasColumnName("is_outsourced")
+            .IsRequired()
+            .HasDefaultValue(false);
+
         // xmin concurrency token
         builder.Property<uint>("xmin")
             .HasColumnType("xid")

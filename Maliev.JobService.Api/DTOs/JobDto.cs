@@ -37,6 +37,8 @@ public record JobDto
     public DateTime CreatedAt { get; init; }
     /// <summary>Gets the timestamp when the job record was last updated.</summary>
     public DateTime UpdatedAt { get; init; }
+    /// <summary>Employee-only. True if job is outsourced.</summary>
+    public bool IsOutsourced { get; init; }
 
     /// <summary>
     /// Maps a Job entity to a JobDto.
@@ -59,6 +61,7 @@ public record JobDto
         StartedAt = job.StartedAt,
         CompletedAt = job.CompletedAt,
         CreatedAt = job.CreatedAt,
-        UpdatedAt = job.UpdatedAt
+        UpdatedAt = job.UpdatedAt,
+        IsOutsourced = job.IsOutsourced
     };
 }

@@ -93,6 +93,13 @@ public class Job
     public int QueuePosition { get; set; }
 
     /// <summary>
+    /// Indicates whether this job is outsourced to an external manufacturing partner.
+    /// Inherits from the parent Order's IsOutsourced flag via event.
+    /// Employee-only field.
+    /// </summary>
+    public bool IsOutsourced { get; set; }
+
+    /// <summary>
     /// Gets or sets the timestamp when the record was created.
     /// </summary>
     public DateTime CreatedAt { get; set; }
