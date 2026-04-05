@@ -39,6 +39,14 @@ public record JobDto
     public DateTime UpdatedAt { get; init; }
     /// <summary>Employee-only. True if job is outsourced.</summary>
     public bool IsOutsourced { get; init; }
+    /// <summary>Gets the scheduled start time for this job.</summary>
+    public DateTime? ScheduledStartTime { get; init; }
+    /// <summary>Gets the scheduled end time for this job.</summary>
+    public DateTime? ScheduledEndTime { get; init; }
+    /// <summary>Gets the setup time in minutes required before production.</summary>
+    public int SetupTimeMinutes { get; init; }
+    /// <summary>Gets the position of this job in the machine queue.</summary>
+    public int QueuePosition { get; init; }
 
     /// <summary>
     /// Maps a Job entity to a JobDto.
@@ -62,6 +70,10 @@ public record JobDto
         CompletedAt = job.CompletedAt,
         CreatedAt = job.CreatedAt,
         UpdatedAt = job.UpdatedAt,
-        IsOutsourced = job.IsOutsourced
+        IsOutsourced = job.IsOutsourced,
+        ScheduledStartTime = job.ScheduledStartTime,
+        ScheduledEndTime = job.ScheduledEndTime,
+        SetupTimeMinutes = job.SetupTimeMinutes,
+        QueuePosition = job.QueuePosition,
     };
 }

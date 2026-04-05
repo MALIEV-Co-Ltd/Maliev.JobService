@@ -111,5 +111,11 @@ public class JobConfiguration : IEntityTypeConfiguration<Job>
 
         builder.HasIndex(j => j.AssignedMachineId)
             .HasDatabaseName("ix_jobs_assigned_machine_id");
+
+        builder.HasIndex(j => new { j.AssignedMachineId, j.QueuePosition })
+            .HasDatabaseName("ix_jobs_machine_queue_position");
+
+        builder.HasIndex(j => new { j.AssignedMachineId, j.ScheduledStartTime })
+            .HasDatabaseName("ix_jobs_machine_scheduled_start");
     }
 }

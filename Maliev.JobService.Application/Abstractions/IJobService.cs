@@ -129,4 +129,23 @@ public interface IJobService
     /// <param name="cancellationToken">A token used to cancel the operation.</param>
     /// <returns>The number of jobs updated.</returns>
     Task<int> UpdateOutsourcingStatusAsync(Guid orderId, bool isOutsourced, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets all scheduled jobs on a specific machine within a UTC date range.
+    /// </summary>
+    /// <param name="machineId">The machine identifier.</param>
+    /// <param name="from">Range start (UTC).</param>
+    /// <param name="to">Range end (UTC).</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    Task<IReadOnlyList<Job>> GetMachineScheduleAsync(
+        string machineId, DateTime from, DateTime to, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reorders a queued job to a new position and cascades rescheduling.
+    /// </summary>
+    /// <param name="id">The job identifier.</param>
+    /// <param name="newPosition">The target queue position (1-based).</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The operation result.</returns>
+    Task<JobOperationResult> ReorderAsync(Guid id, int newPosition, CancellationToken cancellationToken = default);
 }

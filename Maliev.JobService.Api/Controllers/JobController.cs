@@ -215,6 +215,50 @@ public class JobController : ControllerBase
         return ToActionResult(result);
     }
 
+    /// <summary>
+    /// Reorders a queued job to a new queue position on its assigned machine.
+    /// </summary>
+    /// <param name="id">The job ID.</param>
+    /// <param name="request">The reorder request containing the new position (1-based).</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The updated job DTO.</returns>
+    [HttpPatch("{id}/reorder")]
+    [RequirePermission(JobPermissions.JobsWrite)]
+    public async Task<ActionResult<JobDto>> Reorder(Guid id, [FromBody] ReorderJobRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _jobService.ReorderAsync(id, request.NewPosition, cancellationToken);
+        return ToActionResult(result);
+    }
+
+    /// <summary>
+    /// Gets all scheduled jobs on a specific machine within a UTC date range.
+    /// </summary>
+    /// <param name="machineId">The machine identifier.</param>
+    /// <param name="from">Range start (UTC). Defaults to today.</param>
+    /// <param name="to">Range end (UTC). Defaults to 30 days from now.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>List of scheduled job DTOs ordered by start time.</returns>
+    [HttpGet("machine/{machineId}/schedule")]
+    [RequirePermission(JobPermissions.JobsRead)]
+    public async Task<ActionResult<IReadOnlyList<ScheduledJobDto>>> GetMachineSchedule(
+        string machineId,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        CancellationToken cancellationToken)
+    {
+        var rangeFrom = from ?? DateTime.UtcNow.Date;
+        var rangeTo = to ?? DateTime.UtcNow.Date.AddDays(30);
+
+        var jobs = await _jobService.GetMachineScheduleAsync(machineId, rangeFrom, rangeTo, cancellationToken);
+        var dtos = jobs.Select(ScheduledJobDto.FromEntity).ToList();
+
+        _logger.LogInformation(
+            "Retrieved {Count} scheduled jobs for machine {MachineId} from {From:d} to {To:d}",
+            dtos.Count, machineId, rangeFrom, rangeTo);
+
+        return Ok(dtos);
+    }
+
     private ActionResult<JobDto> ToActionResult(Maliev.JobService.Application.Models.JobOperationResult result)
     {
         if (result.IsNotFound)

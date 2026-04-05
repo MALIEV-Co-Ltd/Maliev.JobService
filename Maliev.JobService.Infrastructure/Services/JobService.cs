@@ -41,27 +41,28 @@ public class JobService : IJobService
     private readonly JobDbContext _dbContext;
     private readonly IPublishEndpoint _publishEndpoint;
     private readonly IOrderServiceClient _orderServiceClient;
+    private readonly ISchedulingService _schedulingService;
+    private readonly ITimeEstimationService _timeEstimation;
     private readonly JobMetrics _metrics;
     private readonly ILogger<JobService> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="JobService"/> class.
     /// </summary>
-    /// <param name="dbContext">The EF database context.</param>
-    /// <param name="publishEndpoint">The event publish endpoint.</param>
-    /// <param name="orderServiceClient">The OrderService HTTP client.</param>
-    /// <param name="metrics">The metrics collector.</param>
-    /// <param name="logger">The logger.</param>
     public JobService(
         JobDbContext dbContext,
         IPublishEndpoint publishEndpoint,
         IOrderServiceClient orderServiceClient,
+        ISchedulingService schedulingService,
+        ITimeEstimationService timeEstimation,
         JobMetrics metrics,
         ILogger<JobService> logger)
     {
         _dbContext = dbContext;
         _publishEndpoint = publishEndpoint;
         _orderServiceClient = orderServiceClient;
+        _schedulingService = schedulingService;
+        _timeEstimation = timeEstimation;
         _metrics = metrics;
         _logger = logger;
     }
@@ -158,6 +159,7 @@ public class JobService : IJobService
         job.AssignedMachineId = machineId;
         job.UpdatedAt = DateTime.UtcNow;
 
+        await _schedulingService.ComputeSlotAsync(job, machineId, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
         await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
 
@@ -268,12 +270,16 @@ public class JobService : IJobService
         var previousStatus = job.Status;
         var transitionStart = job.UpdatedAt;
 
+        var completedMachineId = job.AssignedMachineId;
         job.Status = JobStatus.Completed;
         job.CompletedAt = DateTime.UtcNow;
         job.UpdatedAt = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
+
+        if (!string.IsNullOrEmpty(completedMachineId))
+            await _schedulingService.RescheduleQueueAsync(completedMachineId, cancellationToken);
 
         _metrics.RecordTransition(previousStatus.ToString(), job.Status.ToString(), DateTime.UtcNow - transitionStart);
         _logger.LogInformation("Job {JobId} completed at {CompletedAt}", job.Id, job.CompletedAt);
@@ -296,6 +302,7 @@ public class JobService : IJobService
 
         var previousStatus = job.Status;
         var transitionStart = job.UpdatedAt;
+        var cancelledMachineId = job.AssignedMachineId;
 
         job.Status = JobStatus.Cancelled;
         job.Notes = reason;
@@ -303,6 +310,9 @@ public class JobService : IJobService
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
+
+        if (!string.IsNullOrEmpty(cancelledMachineId))
+            await _schedulingService.RescheduleQueueAsync(cancelledMachineId, cancellationToken);
 
         _metrics.RecordTransition(previousStatus.ToString(), job.Status.ToString(), DateTime.UtcNow - transitionStart);
         _logger.LogInformation("Job {JobId} cancelled with reason: {Reason}", job.Id, reason);
@@ -324,10 +334,15 @@ public class JobService : IJobService
             return JobOperationResult.Failure("Can only reassign jobs in Queued status");
         }
 
+        var oldMachineId = job.AssignedMachineId;
         job.AssignedMachineId = machineId;
         job.UpdatedAt = DateTime.UtcNow;
 
+        await _schedulingService.ComputeSlotAsync(job, machineId, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        if (!string.IsNullOrEmpty(oldMachineId) && oldMachineId != machineId)
+            await _schedulingService.RescheduleQueueAsync(oldMachineId, cancellationToken);
 
         _logger.LogInformation("Job {JobId} reassigned to machine {MachineId}", job.Id, machineId);
 
@@ -357,6 +372,10 @@ public class JobService : IJobService
         {
             var priority = CalculatePriority(item.DeliveryDate);
 
+            var estimatedPrintTime = item.EstimatedPrintTimeMinutes > 0
+                ? item.EstimatedPrintTimeMinutes
+                : _timeEstimation.EstimatePrintTimeMinutes(item.Technology, item.VolumeCm3);
+
             var job = new Job
             {
                 Id = Guid.NewGuid(),
@@ -365,7 +384,8 @@ public class JobService : IJobService
                 MaterialId = item.MaterialId,
                 Technology = item.Technology,
                 VolumeCm3 = item.VolumeCm3,
-                EstimatedPrintTimeMinutes = item.EstimatedPrintTimeMinutes,
+                EstimatedPrintTimeMinutes = estimatedPrintTime,
+                SetupTimeMinutes = _timeEstimation.EstimateSetupTimeMinutes(item.Technology),
                 Priority = priority,
                 Status = JobStatus.Pending,
                 CreatedAt = now,
@@ -410,6 +430,31 @@ public class JobService : IJobService
             .ToListAsync(cancellationToken);
 
         return result.ToDictionary(r => r.Technology, r => r.Count);
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<Job>> GetMachineScheduleAsync(
+        string machineId, DateTime from, DateTime to, CancellationToken cancellationToken = default)
+        => _schedulingService.GetMachineScheduleAsync(machineId, from, to, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<JobOperationResult> ReorderAsync(Guid id, int newPosition, CancellationToken cancellationToken = default)
+    {
+        var job = await _dbContext.Jobs.FindAsync([id], cancellationToken);
+        if (job is null)
+            return JobOperationResult.NotFound();
+
+        if (job.Status != JobStatus.Queued)
+            return JobOperationResult.Failure("Can only reorder jobs in Queued status");
+
+        if (string.IsNullOrEmpty(job.AssignedMachineId))
+            return JobOperationResult.Failure("Job has no assigned machine");
+
+        await _schedulingService.ReorderJobAsync(id, newPosition, job.AssignedMachineId, cancellationToken);
+
+        // Reload the job to return updated fields
+        await _dbContext.Entry(job).ReloadAsync(cancellationToken);
+        return JobOperationResult.Success(job);
     }
 
     /// <inheritdoc />

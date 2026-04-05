@@ -4,6 +4,7 @@ using Maliev.JobService.Api.Services;
 using Maliev.JobService.Domain.Clients;
 using Maliev.JobService.Infrastructure.Metrics;
 using Maliev.JobService.Infrastructure.Persistence;
+using Maliev.JobService.Infrastructure.Data.SeedData;
 using Maliev.JobService.Infrastructure.Services;
 
 // Initialize bootstrap logging
@@ -65,6 +66,8 @@ try
 
     builder.Services.AddSingleton<JobMetrics>();
     builder.Services.AddScoped<IJobService, JobService>();
+    builder.Services.AddScoped<ISchedulingService, SchedulingService>();
+    builder.Services.AddSingleton<ITimeEstimationService, TimeEstimationService>();
 
     builder.Services.AddControllers();
 
@@ -73,6 +76,9 @@ try
 
     // --- Database Migrations ---
     await app.MigrateDatabaseAsync<JobDbContext>();
+
+    // --- Seed Jobs ---
+    await app.SeedJobsAsync();
 
     // --- Middleware Pipeline ---
     app.UseStandardMiddleware();
