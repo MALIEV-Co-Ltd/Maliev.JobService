@@ -11,6 +11,7 @@ using MassTransit;
 using System.Diagnostics.Metrics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Testcontainers.PostgreSql;
 using Xunit;
@@ -58,10 +59,15 @@ public class JobServiceTests : IAsyncLifetime
         var meterFactory = new TestMeterFactory();
         _metrics = new JobMetrics(meterFactory);
 
+        var scheduling = new SchedulingService(_dbContext, NullLogger<SchedulingService>.Instance);
+        var estimation = new TimeEstimationService();
+
         _service = new Infrastructure.Services.JobService(
             _dbContext,
             _publishEndpointMock.Object,
             _orderServiceClientMock.Object,
+            scheduling,
+            estimation,
             _metrics,
             _loggerMock.Object);
     }
@@ -291,6 +297,50 @@ public class JobServiceTests : IAsyncLifetime
         Assert.True(result.IsSuccess);
         Assert.Equal(JobStatus.Queued, result.Job!.Status);
         Assert.Equal("machine-1", result.Job.AssignedMachineId);
+    }
+
+    [Fact]
+    public async Task QueueAsync_WhenValid_AssignsSchedulingSlot()
+    {
+        var job = CreateTestJob(JobStatus.Pending);
+        job.SetupTimeMinutes = 15;
+        job.EstimatedPrintTimeMinutes = 120;
+        _dbContext.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        var before = DateTime.UtcNow;
+        await _service.QueueAsync(job.Id, "machine-slot", "user");
+
+        var persisted = await _dbContext.Jobs.FindAsync(job.Id);
+        Assert.NotNull(persisted!.ScheduledStartTime);
+        Assert.NotNull(persisted.ScheduledEndTime);
+        Assert.True(persisted.ScheduledStartTime >= before);
+        Assert.Equal(1, persisted.QueuePosition);
+        // End = Start + setup + print = Start + 135
+        var expectedDuration = TimeSpan.FromMinutes(135);
+        var actualDuration = persisted.ScheduledEndTime!.Value - persisted.ScheduledStartTime!.Value;
+        Assert.Equal(expectedDuration, actualDuration);
+    }
+
+    [Fact]
+    public async Task QueueAsync_TwoJobsSameMachine_SecondStartsAfterFirst()
+    {
+        var job1 = CreateTestJob(JobStatus.Pending);
+        job1.SetupTimeMinutes = 15;
+        job1.EstimatedPrintTimeMinutes = 120;
+        var job2 = CreateTestJob(JobStatus.Pending);
+        job2.SetupTimeMinutes = 15;
+        job2.EstimatedPrintTimeMinutes = 60;
+        _dbContext.Jobs.AddRange(job1, job2);
+        await _dbContext.SaveChangesAsync();
+
+        await _service.QueueAsync(job1.Id, "sequential-machine", "user");
+        await _service.QueueAsync(job2.Id, "sequential-machine", "user");
+
+        var p1 = await _dbContext.Jobs.FindAsync(job1.Id);
+        var p2 = await _dbContext.Jobs.FindAsync(job2.Id);
+        Assert.True(p2!.ScheduledStartTime >= p1!.ScheduledEndTime);
+        Assert.Equal(2, p2.QueuePosition);
     }
 
     #endregion
@@ -593,6 +643,31 @@ public class JobServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task CreateJobsForPaidOrderAsync_PopulatesSetupTimeMinutes()
+    {
+        var orderId = Guid.NewGuid();
+        _orderServiceClientMock
+            .Setup(c => c.GetOrderItemsAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OrderItemDto>
+            {
+                new() { OrderItemId = Guid.NewGuid(), MaterialId = Guid.NewGuid(),
+                        Technology = "FDM", VolumeCm3 = 10, EstimatedPrintTimeMinutes = 0 },
+                new() { OrderItemId = Guid.NewGuid(), MaterialId = Guid.NewGuid(),
+                        Technology = "CNC", VolumeCm3 = 10, EstimatedPrintTimeMinutes = 0 },
+            });
+
+        await _service.CreateJobsForPaidOrderAsync(orderId);
+
+        var jobs = await _dbContext.Jobs.Where(j => j.OrderId == orderId).ToListAsync();
+        var fdm = jobs.First(j => j.Technology == "FDM");
+        var cnc = jobs.First(j => j.Technology == "CNC");
+        Assert.Equal(15, fdm.SetupTimeMinutes);  // FDM setup = 15 min
+        Assert.Equal(60, cnc.SetupTimeMinutes);  // CNC setup = 60 min
+        Assert.True(fdm.EstimatedPrintTimeMinutes >= 30);   // floor applied
+        Assert.True(cnc.EstimatedPrintTimeMinutes >= 30);
+    }
+
+    [Fact]
     public async Task CreateJobsForPaidOrderAsync_WithNoDeliveryDate_SetsPriority999()
     {
         var orderId = Guid.NewGuid();
@@ -617,6 +692,82 @@ public class JobServiceTests : IAsyncLifetime
 
         var job = await _dbContext.Jobs.FirstAsync();
         Assert.Equal(999, job.Priority);
+    }
+
+    #endregion
+
+    #region ReorderAsync
+
+    [Fact]
+    public async Task ReorderAsync_WhenJobNotFound_ReturnsNotFound()
+    {
+        var result = await _service.ReorderAsync(Guid.NewGuid(), 1);
+        Assert.True(result.IsNotFound);
+    }
+
+    [Fact]
+    public async Task ReorderAsync_WhenJobNotQueued_ReturnsFailure()
+    {
+        var job = CreateTestJob(JobStatus.Pending);
+        _dbContext.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.ReorderAsync(job.Id, 1);
+        Assert.False(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task ReorderAsync_WhenNoMachine_ReturnsFailure()
+    {
+        var job = CreateTestJob(JobStatus.Queued);
+        job.AssignedMachineId = null;
+        _dbContext.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.ReorderAsync(job.Id, 1);
+        Assert.False(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task ReorderAsync_WhenValid_ReturnsSuccessWithUpdatedPosition()
+    {
+        var j1 = CreateTestJob(JobStatus.Queued); j1.AssignedMachineId = "reorder-m"; j1.QueuePosition = 1;
+        var j2 = CreateTestJob(JobStatus.Queued); j2.AssignedMachineId = "reorder-m"; j2.QueuePosition = 2;
+        _dbContext.Jobs.AddRange(j1, j2);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.ReorderAsync(j2.Id, 1, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var persisted = await _dbContext.Jobs.FindAsync(j2.Id);
+        Assert.Equal(1, persisted!.QueuePosition);
+    }
+
+    #endregion
+
+    #region GetMachineScheduleAsync
+
+    [Fact]
+    public async Task GetMachineScheduleAsync_ReturnsOnlyJobsInRange()
+    {
+        var inRange = CreateTestJob(JobStatus.Queued);
+        inRange.AssignedMachineId = "sched-m";
+        inRange.ScheduledStartTime = DateTime.UtcNow.AddDays(5);
+        inRange.ScheduledEndTime = inRange.ScheduledStartTime!.Value.AddHours(2);
+
+        var outOfRange = CreateTestJob(JobStatus.Queued);
+        outOfRange.AssignedMachineId = "sched-m";
+        outOfRange.ScheduledStartTime = DateTime.UtcNow.AddDays(60);
+        outOfRange.ScheduledEndTime = outOfRange.ScheduledStartTime!.Value.AddHours(2);
+
+        _dbContext.Jobs.AddRange(inRange, outOfRange);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.GetMachineScheduleAsync(
+            "sched-m", DateTime.UtcNow, DateTime.UtcNow.AddDays(30));
+
+        Assert.Single(result);
+        Assert.Equal(inRange.Id, result[0].Id);
     }
 
     #endregion

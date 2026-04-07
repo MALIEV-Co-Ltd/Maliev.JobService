@@ -11,9 +11,11 @@ public record OrderItemDto
     public required Guid MaterialId { get; init; }
     /// <summary>Gets the manufacturing technology.</summary>
     public required string Technology { get; init; }
-    /// <summary>Gets the part volume in cubic centimeters.</summary>
+    /// <summary>Gets the part volume in cubic centimeters (per unit).</summary>
     public decimal VolumeCm3 { get; init; }
-    /// <summary>Gets the estimated print time in minutes.</summary>
+    /// <summary>Gets the ordered quantity. Multiplied against VolumeCm3 when estimating total print time.</summary>
+    public int Quantity { get; init; } = 1;
+    /// <summary>Gets the estimated print time in minutes (per unit, 0 means auto-estimate).</summary>
     public int EstimatedPrintTimeMinutes { get; init; }
     /// <summary>Gets the scheduled delivery date.</summary>
     public DateTime? DeliveryDate { get; init; }

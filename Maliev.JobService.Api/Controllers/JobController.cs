@@ -246,8 +246,8 @@ public class JobController : ControllerBase
         [FromQuery] DateTime? to,
         CancellationToken cancellationToken)
     {
-        var rangeFrom = from ?? DateTime.UtcNow.Date;
-        var rangeTo = to ?? DateTime.UtcNow.Date.AddDays(30);
+        var rangeFrom = DateTime.SpecifyKind(from ?? DateTime.UtcNow.Date, DateTimeKind.Utc);
+        var rangeTo = DateTime.SpecifyKind(to ?? DateTime.UtcNow.Date.AddDays(30), DateTimeKind.Utc);
 
         var jobs = await _jobService.GetMachineScheduleAsync(machineId, rangeFrom, rangeTo, cancellationToken);
         var dtos = jobs.Select(ScheduledJobDto.FromEntity).ToList();

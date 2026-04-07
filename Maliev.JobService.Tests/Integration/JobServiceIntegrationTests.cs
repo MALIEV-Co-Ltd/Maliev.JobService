@@ -9,6 +9,7 @@ using MassTransit;
 using System.Diagnostics.Metrics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Testcontainers.PostgreSql;
 using Xunit;
@@ -52,10 +53,15 @@ public class JobServiceIntegrationTests : IAsyncLifetime
         var meterFactory = new TestMeterFactory();
         _metrics = new JobMetrics(meterFactory);
 
+        var scheduling = new SchedulingService(_dbContext, NullLogger<SchedulingService>.Instance);
+        var estimation = new TimeEstimationService();
+
         _service = new Infrastructure.Services.JobService(
             _dbContext,
             _publishEndpointMock.Object,
             _orderServiceClientMock.Object,
+            scheduling,
+            estimation,
             _metrics,
             _loggerMock.Object);
     }
@@ -111,10 +117,14 @@ public class JobServiceIntegrationTests : IAsyncLifetime
         var result = await _service!.QueueAsync(job.Id, "machine-1", "testuser");
 
         Assert.True(result.IsSuccess);
-        
+
         var updatedJob = await _dbContext.Jobs.FirstAsync(j => j.Id == job.Id);
         Assert.Equal(JobStatus.Queued, updatedJob.Status);
         Assert.Equal("machine-1", updatedJob.AssignedMachineId);
+        // Scheduling slot must be assigned
+        Assert.NotNull(updatedJob.ScheduledStartTime);
+        Assert.NotNull(updatedJob.ScheduledEndTime);
+        Assert.Equal(1, updatedJob.QueuePosition);
     }
 
     [Fact]

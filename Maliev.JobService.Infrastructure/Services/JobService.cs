@@ -372,9 +372,10 @@ public class JobService : IJobService
         {
             var priority = CalculatePriority(item.DeliveryDate);
 
+            var quantity = Math.Max(1, item.Quantity);
             var estimatedPrintTime = item.EstimatedPrintTimeMinutes > 0
-                ? item.EstimatedPrintTimeMinutes
-                : _timeEstimation.EstimatePrintTimeMinutes(item.Technology, item.VolumeCm3);
+                ? item.EstimatedPrintTimeMinutes * quantity
+                : _timeEstimation.EstimatePrintTimeMinutes(item.Technology, item.VolumeCm3 * quantity);
 
             var job = new Job
             {

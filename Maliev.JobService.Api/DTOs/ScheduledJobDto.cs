@@ -8,7 +8,7 @@ namespace Maliev.JobService.Api.DTOs;
 public record ScheduledJobDto
 {
     /// <summary>Gets the job identifier.</summary>
-    public required Guid Id { get; init; }
+    public required Guid JobId { get; init; }
     /// <summary>Gets the manufacturing technology.</summary>
     public required string Technology { get; init; }
     /// <summary>Gets the scheduled start time (UTC).</summary>
@@ -29,7 +29,7 @@ public record ScheduledJobDto
     /// <summary>Maps a Job entity to a ScheduledJobDto.</summary>
     public static ScheduledJobDto FromEntity(Job job) => new()
     {
-        Id = job.Id,
+        JobId = job.Id,
         Technology = job.Technology,
         ScheduledStart = job.ScheduledStartTime!.Value,
         ScheduledEnd = job.ScheduledEndTime!.Value,
