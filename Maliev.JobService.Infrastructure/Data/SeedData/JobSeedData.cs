@@ -13,10 +13,10 @@ public static class JobSeedData
         .Select(i => Guid.Parse($"aaaa{i:D4}-bbbb-cccc-dddd-eeee{i:D8}"))
         .ToArray();
 
-    private static readonly Guid MatPla     = Guid.Parse("aa000001-0000-0000-0000-000000000001");
-    private static readonly Guid MatAbs     = Guid.Parse("aa000002-0000-0000-0000-000000000002");
-    private static readonly Guid MatPetg    = Guid.Parse("aa000003-0000-0000-0000-000000000003");
-    private static readonly Guid MatResin   = Guid.Parse("aa000004-0000-0000-0000-000000000004");
+    private static readonly Guid MatPla = Guid.Parse("aa000001-0000-0000-0000-000000000001");
+    private static readonly Guid MatAbs = Guid.Parse("aa000002-0000-0000-0000-000000000002");
+    private static readonly Guid MatPetg = Guid.Parse("aa000003-0000-0000-0000-000000000003");
+    private static readonly Guid MatResin = Guid.Parse("aa000004-0000-0000-0000-000000000004");
 
     public static IEnumerable<Job> GetAll()
     {

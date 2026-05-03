@@ -29,21 +29,21 @@ public class OrderServiceClient : IOrderServiceClient
     public async Task<List<OrderItemDto>> GetOrderItemsAsync(Guid orderId, CancellationToken cancellationToken = default)
     {
         var response = await _httpClient.GetAsync($"/api/orders/{orderId}/items", cancellationToken);
-        
+
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             _logger.LogWarning("Order {OrderId} not found, returning empty list", orderId);
             return [];
         }
-        
+
         response.EnsureSuccessStatusCode();
-        
+
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
         var items = JsonSerializer.Deserialize<List<OrderItemDto>>(content, new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true
         });
-        
+
         return items ?? [];
     }
 

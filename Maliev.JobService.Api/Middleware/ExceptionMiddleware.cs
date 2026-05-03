@@ -36,10 +36,10 @@ public class ExceptionMiddleware
         catch (Exception ex)
         {
             _logger.LogError(ex, "An unhandled exception occurred");
-            
+
             context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
             context.Response.ContentType = "application/json";
-            
+
             var response = new
             {
                 error = new
@@ -49,7 +49,7 @@ public class ExceptionMiddleware
                     traceId = context.TraceIdentifier
                 }
             };
-            
+
             await context.Response.WriteAsync(JsonSerializer.Serialize(response));
         }
     }
