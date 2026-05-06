@@ -60,6 +60,12 @@ public static class JobSeedData
         var j13End = j12End.AddMinutes(30 + 180);
         var j14End = j13End.AddMinutes(30 + 150);
 
+        // ── MAL-CNC-001 (HAAS VF2) ──────────────────────────────────────────
+        //   CNC queue used by the project planning tab for milling route tests.
+        var j15End = now.AddHours(-2).AddMinutes(60 + 180);
+        var j16End = j15End.AddMinutes(60 + 240);
+        var j17End = j16End.AddMinutes(60 + 210);
+
         return new List<Job>
         {
             // ── FDM-001: InProgress ───────────────────────────────────────────
@@ -300,6 +306,54 @@ public static class JobSeedData
                 Notes = "Pending — awaiting material restock",
                 ScheduledStartTime = null, ScheduledEndTime = null,
                 CreatedAt = now.AddHours(-3), UpdatedAt = now, IsOutsourced = false
+            },
+
+            // ── CNC-001: InProgress and queued milling work ──────────────────
+            new()
+            {
+                Id = Guid.Parse("05000000-0000-0000-0000-000000000001"),
+                OrderId = Guid.Parse("aa000005-5555-5555-5555-000000000005"),
+                OrderItemId = Guid.Parse("bb000005-5555-5555-5555-000000000005"),
+                MaterialId = Guid.Parse("aa000005-0000-0000-0000-000000000005"),
+                Technology = "CNC_MILL", VolumeCm3 = 42.0m,
+                EstimatedPrintTimeMinutes = 180, SetupTimeMinutes = 60,
+                AssignedMachineId = "MAL-CNC-001", Priority = 1,
+                Status = JobStatus.InProgress, QueuePosition = 1,
+                Notes = "Demo CNC milling job — fixture plate",
+                ScheduledStartTime = now.AddHours(-2),
+                ScheduledEndTime = j15End,
+                StartedAt = now.AddHours(-2),
+                CreatedAt = now.AddHours(-8), UpdatedAt = now, IsOutsourced = false
+            },
+            new()
+            {
+                Id = Guid.Parse("05000000-0000-0000-0000-000000000002"),
+                OrderId = Guid.Parse("aa000006-6666-6666-6666-000000000006"),
+                OrderItemId = Guid.Parse("bb000006-6666-6666-6666-000000000006"),
+                MaterialId = Guid.Parse("aa000006-0000-0000-0000-000000000006"),
+                Technology = "CNC_MILL", VolumeCm3 = 36.5m,
+                EstimatedPrintTimeMinutes = 240, SetupTimeMinutes = 60,
+                AssignedMachineId = "MAL-CNC-001", Priority = 2,
+                Status = JobStatus.Queued, QueuePosition = 2,
+                Notes = "Demo CNC milling job — bracket set",
+                ScheduledStartTime = j15End,
+                ScheduledEndTime = j16End,
+                CreatedAt = now.AddHours(-6), UpdatedAt = now, IsOutsourced = false
+            },
+            new()
+            {
+                Id = Guid.Parse("05000000-0000-0000-0000-000000000003"),
+                OrderId = Guid.Parse("aa000007-7777-7777-7777-000000000007"),
+                OrderItemId = Guid.Parse("bb000007-7777-7777-7777-000000000007"),
+                MaterialId = Guid.Parse("aa000007-0000-0000-0000-000000000007"),
+                Technology = "CNC_MILL", VolumeCm3 = 31.0m,
+                EstimatedPrintTimeMinutes = 210, SetupTimeMinutes = 60,
+                AssignedMachineId = "MAL-CNC-001", Priority = 2,
+                Status = JobStatus.Queued, QueuePosition = 3,
+                Notes = "Demo CNC milling job — enclosure base",
+                ScheduledStartTime = j16End,
+                ScheduledEndTime = j17End,
+                CreatedAt = now.AddHours(-5), UpdatedAt = now, IsOutsourced = false
             },
         };
     }

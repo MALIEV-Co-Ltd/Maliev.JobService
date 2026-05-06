@@ -17,17 +17,25 @@ public static class DatabaseSeeder
 
         try
         {
-            if (await context.Jobs.AnyAsync())
+            var jobs = JobSeedData.GetAll().ToList();
+            var existingIds = await context.Jobs
+                .AsNoTracking()
+                .Select(job => job.Id)
+                .ToListAsync();
+            var missingJobs = jobs
+                .Where(job => !existingIds.Contains(job.Id))
+                .ToList();
+
+            if (missingJobs.Count == 0)
             {
-                logger.LogInformation("Jobs table already has data. Skipping seed.");
+                logger.LogInformation("All seeded manufacturing jobs already exist. Skipping seed.");
                 return;
             }
 
             logger.LogInformation("Seeding manufacturing jobs...");
 
-            var jobs = JobSeedData.GetAll().ToList();
             var now = DateTime.UtcNow;
-            foreach (var job in jobs)
+            foreach (var job in missingJobs)
             {
                 job.CreatedAt = now;
                 job.UpdatedAt = now;
@@ -38,7 +46,7 @@ public static class DatabaseSeeder
             {
                 await using var tx = await context.Database.BeginTransactionAsync();
 
-                foreach (var job in jobs)
+                foreach (var job in missingJobs)
                 {
                     await context.Jobs.AddAsync(job);
                 }
@@ -47,7 +55,7 @@ public static class DatabaseSeeder
                 await tx.CommitAsync();
             });
 
-            logger.LogInformation("Seeded {Count} jobs.", jobs.Count);
+            logger.LogInformation("Seeded {Count} jobs.", missingJobs.Count);
         }
         catch (Exception ex)
         {
