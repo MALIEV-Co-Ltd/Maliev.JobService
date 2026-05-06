@@ -68,6 +68,14 @@ namespace Maliev.JobService.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("order_item_id");
 
+                    b.Property<Guid?>("SourceProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_project_id");
+
+                    b.Property<Guid?>("SourceProjectPartId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_project_part_id");
+
                     b.Property<int>("Priority")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -132,6 +140,9 @@ namespace Maliev.JobService.Infrastructure.Migrations
                     b.HasIndex("Status")
                         .HasDatabaseName("ix_jobs_status");
 
+                    b.HasIndex("SourceProjectId", "SourceProjectPartId")
+                        .HasDatabaseName("ix_jobs_source_project_part");
+
                     b.HasIndex("AssignedMachineId", "QueuePosition")
                         .HasDatabaseName("ix_jobs_machine_queue_position");
 
@@ -139,6 +150,117 @@ namespace Maliev.JobService.Infrastructure.Migrations
                         .HasDatabaseName("ix_jobs_machine_scheduled_start");
 
                     b.ToTable("jobs", "public");
+                });
+
+            modelBuilder.Entity("Maliev.JobService.Domain.Entities.ProductionPlanningHold", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ConvertedJobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("converted_job_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("MachineId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("machine_id");
+
+                    b.Property<string>("MachineName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("machine_name");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("notes");
+
+                    b.Property<int>("ProductionTimeMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("production_time_minutes");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Guid>("ProjectPartId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_part_id");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.Property<int>("QueuePosition")
+                        .HasColumnType("integer")
+                        .HasColumnName("queue_position");
+
+                    b.Property<DateTime>("ScheduledEndTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("scheduled_end_time");
+
+                    b.Property<DateTime>("ScheduledStartTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("scheduled_start_time");
+
+                    b.Property<int>("SetupTimeMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("setup_time_minutes");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Technology")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("technology");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_production_planning_holds_expires_at");
+
+                    b.HasIndex("MachineId", "Status", "ScheduledStartTime")
+                        .HasDatabaseName("ix_production_planning_holds_machine_status_start");
+
+                    b.HasIndex("ProjectId", "ProjectPartId")
+                        .HasDatabaseName("ix_production_planning_holds_project_part");
+
+                    b.HasIndex("Technology", "Status")
+                        .HasDatabaseName("ix_production_planning_holds_technology_status");
+
+                    b.ToTable("production_planning_holds", "public");
                 });
 #pragma warning restore 612, 618
         }

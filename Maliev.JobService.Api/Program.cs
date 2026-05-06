@@ -68,6 +68,7 @@ try
     builder.Services.AddScoped<IJobService, JobService>();
     builder.Services.AddScoped<ISchedulingService, SchedulingService>();
     builder.Services.AddSingleton<ITimeEstimationService, TimeEstimationService>();
+    builder.Services.AddHostedService<PlanningHoldExpirationHostedService>();
 
     builder.Services.AddControllers();
 

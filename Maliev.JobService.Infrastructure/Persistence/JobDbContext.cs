@@ -22,9 +22,15 @@ public class JobDbContext : DbContext
     /// </summary>
     public DbSet<Job> Jobs => Set<Job>();
 
+    /// <summary>
+    /// Gets or sets the database set for tentative production planning holds.
+    /// </summary>
+    public DbSet<ProductionPlanningHold> ProductionPlanningHolds => Set<ProductionPlanningHold>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfiguration(new JobConfiguration());
+        modelBuilder.ApplyConfiguration(new ProductionPlanningHoldConfiguration());
     }
 }

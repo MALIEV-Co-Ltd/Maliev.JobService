@@ -7,6 +7,10 @@ public record OrderItemDto
 {
     /// <summary>Gets the unique identifier of the order item.</summary>
     public required Guid OrderItemId { get; init; }
+    /// <summary>Gets the originating project ID when the order item came from a project quotation.</summary>
+    public Guid? SourceProjectId { get; init; }
+    /// <summary>Gets the originating project part ID when the order item came from a project quotation.</summary>
+    public Guid? SourceProjectPartId { get; init; }
     /// <summary>Gets the unique identifier of the material.</summary>
     public required Guid MaterialId { get; init; }
     /// <summary>Gets the manufacturing technology.</summary>

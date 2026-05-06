@@ -129,6 +129,76 @@ public class JobController : ControllerBase
     }
 
     /// <summary>
+    /// Gets tentative production planning holds.
+    /// </summary>
+    /// <param name="projectId">Optional source project filter.</param>
+    /// <param name="technology">Optional technology filter.</param>
+    /// <param name="activeOnly">True to return active non-expired holds only.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The matching planning holds.</returns>
+    [HttpGet("planning-holds")]
+    [RequirePermission(JobPermissions.JobsRead)]
+    public async Task<ActionResult<IReadOnlyList<ProductionPlanningHoldDto>>> GetPlanningHolds(
+        [FromQuery] Guid? projectId,
+        [FromQuery] string? technology,
+        [FromQuery] bool activeOnly = true,
+        CancellationToken cancellationToken = default)
+    {
+        var holds = await _jobService.GetPlanningHoldsAsync(projectId, technology, activeOnly, cancellationToken);
+        return Ok(holds.Select(ProductionPlanningHoldDto.FromEntity).ToList());
+    }
+
+    /// <summary>
+    /// Creates a tentative production planning hold.
+    /// </summary>
+    /// <param name="request">The create request.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The created planning hold.</returns>
+    [HttpPost("planning-holds")]
+    [RequirePermission(JobPermissions.JobsWrite)]
+    public async Task<ActionResult<ProductionPlanningHoldDto>> CreatePlanningHold(
+        [FromBody] CreateProductionPlanningHoldRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _jobService.CreatePlanningHoldAsync(request.ToCommand(), GetCurrentUserId(), cancellationToken);
+        return ToPlanningHoldActionResult(result);
+    }
+
+    /// <summary>
+    /// Updates a tentative production planning hold.
+    /// </summary>
+    /// <param name="id">The planning hold identifier.</param>
+    /// <param name="request">The update request.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The updated planning hold.</returns>
+    [HttpPatch("planning-holds/{id:guid}")]
+    [RequirePermission(JobPermissions.JobsWrite)]
+    public async Task<ActionResult<ProductionPlanningHoldDto>> UpdatePlanningHold(
+        Guid id,
+        [FromBody] UpdateProductionPlanningHoldRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _jobService.UpdatePlanningHoldAsync(id, request.ToCommand(), cancellationToken);
+        return ToPlanningHoldActionResult(result);
+    }
+
+    /// <summary>
+    /// Cancels a tentative production planning hold.
+    /// </summary>
+    /// <param name="id">The planning hold identifier.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The cancelled planning hold.</returns>
+    [HttpDelete("planning-holds/{id:guid}")]
+    [RequirePermission(JobPermissions.JobsWrite)]
+    public async Task<ActionResult<ProductionPlanningHoldDto>> CancelPlanningHold(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var result = await _jobService.CancelPlanningHoldAsync(id, cancellationToken);
+        return ToPlanningHoldActionResult(result);
+    }
+
+    /// <summary>
     /// Queues a job on a specific machine.
     /// </summary>
     /// <param name="id">The job ID.</param>
@@ -250,13 +320,39 @@ public class JobController : ControllerBase
         var rangeTo = DateTime.SpecifyKind(to ?? DateTime.UtcNow.Date.AddDays(30), DateTimeKind.Utc);
 
         var jobs = await _jobService.GetMachineScheduleAsync(machineId, rangeFrom, rangeTo, cancellationToken);
-        var dtos = jobs.Select(ScheduledJobDto.FromEntity).ToList();
+        var holds = await _jobService.GetPlanningHoldsAsync(null, null, activeOnly: true, cancellationToken);
+        var holdDtos = holds
+            .Where(hold =>
+                hold.MachineId.Equals(machineId, StringComparison.OrdinalIgnoreCase) &&
+                hold.ScheduledStartTime >= rangeFrom &&
+                hold.ScheduledStartTime <= rangeTo)
+            .Select(ScheduledJobDto.FromHold);
+        var dtos = jobs
+            .Select(ScheduledJobDto.FromEntity)
+            .Concat(holdDtos)
+            .OrderBy(item => item.ScheduledStart)
+            .ToList();
 
         _logger.LogInformation(
             "Retrieved {Count} scheduled jobs for machine {MachineId} from {From:d} to {To:d}",
             dtos.Count, machineId, rangeFrom, rangeTo);
 
         return Ok(dtos);
+    }
+
+    private ActionResult<ProductionPlanningHoldDto> ToPlanningHoldActionResult(Maliev.JobService.Application.Models.PlanningHoldOperationResult result)
+    {
+        if (result.IsNotFound)
+        {
+            return NotFound();
+        }
+
+        if (!result.IsSuccess)
+        {
+            return Conflict(new { error = result.Error ?? "Planning hold operation failed" });
+        }
+
+        return Ok(ProductionPlanningHoldDto.FromEntity(result.Hold!));
     }
 
     private ActionResult<JobDto> ToActionResult(Maliev.JobService.Application.Models.JobOperationResult result)

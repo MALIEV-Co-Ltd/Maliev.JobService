@@ -25,6 +25,16 @@ public record ScheduledJobDto
     public required string Status { get; init; }
     /// <summary>Gets the order ID for cross-referencing.</summary>
     public Guid OrderId { get; init; }
+    /// <summary>Gets a value indicating whether this schedule item is a tentative planning hold.</summary>
+    public bool IsHold { get; init; }
+    /// <summary>Gets the planning hold identifier when <see cref="IsHold"/> is true.</summary>
+    public Guid? HoldId { get; init; }
+    /// <summary>Gets the source project identifier for a planning hold or project-originated job.</summary>
+    public Guid? ProjectId { get; init; }
+    /// <summary>Gets the source project part identifier for a planning hold or project-originated job.</summary>
+    public Guid? ProjectPartId { get; init; }
+    /// <summary>Gets the planning hold expiration time when <see cref="IsHold"/> is true.</summary>
+    public DateTime? ExpiresAt { get; init; }
 
     /// <summary>Maps a Job entity to a ScheduledJobDto.</summary>
     public static ScheduledJobDto FromEntity(Job job) => new()
@@ -38,5 +48,26 @@ public record ScheduledJobDto
         QueuePosition = job.QueuePosition,
         Status = job.Status.ToString(),
         OrderId = job.OrderId,
+        ProjectId = job.SourceProjectId,
+        ProjectPartId = job.SourceProjectPartId,
+    };
+
+    /// <summary>Maps a planning hold entity to a ScheduledJobDto.</summary>
+    public static ScheduledJobDto FromHold(ProductionPlanningHold hold) => new()
+    {
+        JobId = hold.ConvertedJobId ?? hold.Id,
+        Technology = hold.Technology,
+        ScheduledStart = hold.ScheduledStartTime,
+        ScheduledEnd = hold.ScheduledEndTime,
+        SetupMinutes = hold.SetupTimeMinutes,
+        PrintMinutes = hold.ProductionTimeMinutes,
+        QueuePosition = hold.QueuePosition,
+        Status = "Planning Hold",
+        OrderId = Guid.Empty,
+        IsHold = true,
+        HoldId = hold.Id,
+        ProjectId = hold.ProjectId,
+        ProjectPartId = hold.ProjectPartId,
+        ExpiresAt = hold.ExpiresAt,
     };
 }

@@ -696,6 +696,141 @@ public class JobServiceTests : IAsyncLifetime
 
     #endregion
 
+    #region PlanningHolds
+
+    [Fact]
+    public async Task CreatePlanningHoldAsync_WithValidRequest_CreatesActiveHold()
+    {
+        var projectId = Guid.NewGuid();
+        var partId = Guid.NewGuid();
+        var start = DateTime.UtcNow.AddHours(2);
+
+        var result = await _service.CreatePlanningHoldAsync(new CreatePlanningHoldCommand
+        {
+            ProjectId = projectId,
+            ProjectPartId = partId,
+            Technology = "FDM",
+            MachineId = "FDM-01",
+            MachineName = "FDM Printer 01",
+            ScheduledStartTime = start,
+            SetupTimeMinutes = 15,
+            ProductionTimeMinutes = 45,
+            Quantity = 3,
+            ExpiresAt = DateTime.UtcNow.AddHours(72),
+        }, "planner");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(PlanningHoldStatus.Active, result.Hold!.Status);
+        Assert.Equal(projectId, result.Hold.ProjectId);
+        Assert.Equal(partId, result.Hold.ProjectPartId);
+        Assert.Equal("FDM-01", result.Hold.MachineId);
+        Assert.Equal(1, result.Hold.QueuePosition);
+        Assert.Equal(TimeSpan.FromMinutes(60), result.Hold.ScheduledEndTime - result.Hold.ScheduledStartTime);
+    }
+
+    [Fact]
+    public async Task GetQueueDepthByTechnologyAsync_IncludesActivePlanningHolds()
+    {
+        await _service.CreatePlanningHoldAsync(new CreatePlanningHoldCommand
+        {
+            ProjectId = Guid.NewGuid(),
+            ProjectPartId = Guid.NewGuid(),
+            Technology = "FDM",
+            MachineId = "FDM-02",
+            ScheduledStartTime = DateTime.UtcNow.AddHours(1),
+            SetupTimeMinutes = 15,
+            ProductionTimeMinutes = 30,
+            Quantity = 1,
+            ExpiresAt = DateTime.UtcNow.AddHours(72),
+        }, "planner");
+
+        var depth = await _service.GetQueueDepthByTechnologyAsync("FDM");
+
+        Assert.True(depth.TryGetValue("FDM", out var count));
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task ExpirePlanningHoldsAsync_WhenExpired_MarksHoldExpired()
+    {
+        var hold = new ProductionPlanningHold
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = Guid.NewGuid(),
+            ProjectPartId = Guid.NewGuid(),
+            Technology = "CNC_MILL",
+            MachineId = "CNC-01",
+            QueuePosition = 1,
+            ScheduledStartTime = DateTime.UtcNow.AddHours(1),
+            ScheduledEndTime = DateTime.UtcNow.AddHours(2),
+            SetupTimeMinutes = 60,
+            ProductionTimeMinutes = 60,
+            Quantity = 1,
+            Status = PlanningHoldStatus.Active,
+            CreatedBy = "planner",
+            CreatedAt = DateTime.UtcNow.AddDays(-4),
+            UpdatedAt = DateTime.UtcNow.AddDays(-4),
+            ExpiresAt = DateTime.UtcNow.AddMinutes(-1),
+        };
+        _dbContext.ProductionPlanningHolds.Add(hold);
+        await _dbContext.SaveChangesAsync();
+
+        var expired = await _service.ExpirePlanningHoldsAsync(DateTime.UtcNow);
+
+        var persisted = await _dbContext.ProductionPlanningHolds.FindAsync(hold.Id);
+        Assert.Equal(1, expired);
+        Assert.Equal(PlanningHoldStatus.Expired, persisted!.Status);
+    }
+
+    [Fact]
+    public async Task CreateJobsForPaidOrderAsync_WithMatchingPlanningHold_ConvertsHoldToJobSchedule()
+    {
+        var orderId = Guid.NewGuid();
+        var projectId = Guid.NewGuid();
+        var partId = Guid.NewGuid();
+        var start = DateTime.UtcNow.AddHours(4);
+        var holdResult = await _service.CreatePlanningHoldAsync(new CreatePlanningHoldCommand
+        {
+            ProjectId = projectId,
+            ProjectPartId = partId,
+            Technology = "FDM",
+            MachineId = "FDM-03",
+            ScheduledStartTime = start,
+            SetupTimeMinutes = 15,
+            ProductionTimeMinutes = 60,
+            Quantity = 2,
+            ExpiresAt = DateTime.UtcNow.AddHours(72),
+        }, "planner");
+
+        _orderServiceClientMock
+            .Setup(c => c.GetOrderItemsAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OrderItemDto>
+            {
+                new()
+                {
+                    OrderItemId = Guid.NewGuid(),
+                    SourceProjectId = projectId,
+                    SourceProjectPartId = partId,
+                    MaterialId = Guid.NewGuid(),
+                    Technology = "FDM",
+                    VolumeCm3 = 10,
+                    Quantity = 2,
+                    EstimatedPrintTimeMinutes = 30,
+                }
+            });
+
+        await _service.CreateJobsForPaidOrderAsync(orderId);
+
+        var job = await _dbContext.Jobs.SingleAsync(job => job.OrderId == orderId);
+        var hold = await _dbContext.ProductionPlanningHolds.FindAsync(holdResult.Hold!.Id);
+        Assert.Equal("FDM-03", job.AssignedMachineId);
+        Assert.Equal(start, job.ScheduledStartTime);
+        Assert.Equal(PlanningHoldStatus.Converted, hold!.Status);
+        Assert.Equal(job.Id, hold.ConvertedJobId);
+    }
+
+    #endregion
+
     #region ReorderAsync
 
     [Fact]

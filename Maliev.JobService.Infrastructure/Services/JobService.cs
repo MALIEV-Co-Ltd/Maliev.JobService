@@ -382,6 +382,8 @@ public class JobService : IJobService
                 Id = Guid.NewGuid(),
                 OrderId = orderId,
                 OrderItemId = item.OrderItemId,
+                SourceProjectId = item.SourceProjectId,
+                SourceProjectPartId = item.SourceProjectPartId,
                 MaterialId = item.MaterialId,
                 Technology = item.Technology,
                 VolumeCm3 = item.VolumeCm3,
@@ -393,6 +395,7 @@ public class JobService : IJobService
                 UpdatedAt = now,
             };
 
+            await ApplyMatchingPlanningHoldAsync(job, item, now, cancellationToken);
             _dbContext.Jobs.Add(job);
 
             _logger.LogInformation(
@@ -415,6 +418,8 @@ public class JobService : IJobService
     public async Task<Dictionary<string, int>> GetQueueDepthByTechnologyAsync(string? technology, CancellationToken cancellationToken = default)
     {
         var activeStatuses = new[] { JobStatus.Queued, JobStatus.InProgress };
+        var now = DateTime.UtcNow;
+        await ExpirePlanningHoldsAsync(now, cancellationToken);
 
         var query = _dbContext.Jobs
             .AsNoTracking()
@@ -430,13 +435,211 @@ public class JobService : IJobService
             .Select(g => new { Technology = g.Key, Count = g.Count() })
             .ToListAsync(cancellationToken);
 
-        return result.ToDictionary(r => r.Technology, r => r.Count);
+        var counts = result.ToDictionary(r => r.Technology, r => r.Count);
+
+        var holdQuery = _dbContext.ProductionPlanningHolds
+            .AsNoTracking()
+            .Where(hold => hold.Status == PlanningHoldStatus.Active && hold.ExpiresAt > now);
+
+        if (!string.IsNullOrWhiteSpace(technology))
+        {
+            holdQuery = holdQuery.Where(hold => hold.Technology == technology);
+        }
+
+        var holdCounts = await holdQuery
+            .GroupBy(hold => hold.Technology)
+            .Select(group => new { Technology = group.Key, Count = group.Count() })
+            .ToListAsync(cancellationToken);
+
+        foreach (var holdCount in holdCounts)
+        {
+            counts[holdCount.Technology] = counts.GetValueOrDefault(holdCount.Technology) + holdCount.Count;
+        }
+
+        return counts;
     }
 
     /// <inheritdoc />
     public Task<IReadOnlyList<Job>> GetMachineScheduleAsync(
         string machineId, DateTime from, DateTime to, CancellationToken cancellationToken = default)
         => _schedulingService.GetMachineScheduleAsync(machineId, from, to, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ProductionPlanningHold>> GetPlanningHoldsAsync(
+        Guid? projectId,
+        string? technology,
+        bool activeOnly = true,
+        CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        await ExpirePlanningHoldsAsync(now, cancellationToken);
+
+        var query = _dbContext.ProductionPlanningHolds.AsNoTracking();
+
+        if (projectId.HasValue)
+        {
+            query = query.Where(hold => hold.ProjectId == projectId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(technology))
+        {
+            query = query.Where(hold => hold.Technology == technology);
+        }
+
+        if (activeOnly)
+        {
+            query = query.Where(hold => hold.Status == PlanningHoldStatus.Active && hold.ExpiresAt > now);
+        }
+
+        return await query
+            .OrderBy(hold => hold.MachineId)
+            .ThenBy(hold => hold.QueuePosition)
+            .ThenBy(hold => hold.ScheduledStartTime)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<PlanningHoldOperationResult> CreatePlanningHoldAsync(
+        CreatePlanningHoldCommand command,
+        string createdBy,
+        CancellationToken cancellationToken = default)
+    {
+        var validationError = ValidatePlanningHold(command.ProjectId, command.ProjectPartId, command.Technology, command.MachineId, command.ExpiresAt);
+        if (!string.IsNullOrWhiteSpace(validationError))
+        {
+            return PlanningHoldOperationResult.Failure(validationError);
+        }
+
+        var now = DateTime.UtcNow;
+        await ExpirePlanningHoldsAsync(now, cancellationToken);
+
+        var existing = await _dbContext.ProductionPlanningHolds
+            .FirstOrDefaultAsync(hold =>
+                hold.ProjectId == command.ProjectId &&
+                hold.ProjectPartId == command.ProjectPartId &&
+                hold.Status == PlanningHoldStatus.Active,
+                cancellationToken);
+
+        if (existing is not null)
+        {
+            return PlanningHoldOperationResult.Failure("An active planning hold already exists for this project part.");
+        }
+
+        var hold = new ProductionPlanningHold
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = command.ProjectId,
+            ProjectPartId = command.ProjectPartId,
+            Technology = command.Technology,
+            MachineId = command.MachineId,
+            MachineName = command.MachineName,
+            QueuePosition = await ResolveHoldQueuePositionAsync(command.MachineId, command.QueuePosition, cancellationToken),
+            ScheduledStartTime = EnsureUtc(command.ScheduledStartTime),
+            ScheduledEndTime = ResolveHoldEnd(EnsureUtc(command.ScheduledStartTime), command.ScheduledEndTime, command.SetupTimeMinutes, command.ProductionTimeMinutes),
+            SetupTimeMinutes = Math.Max(0, command.SetupTimeMinutes),
+            ProductionTimeMinutes = Math.Max(1, command.ProductionTimeMinutes),
+            Quantity = Math.Max(1, command.Quantity),
+            Status = PlanningHoldStatus.Active,
+            Notes = command.Notes,
+            CreatedBy = createdBy,
+            CreatedAt = now,
+            UpdatedAt = now,
+            ExpiresAt = EnsureUtc(command.ExpiresAt)
+        };
+
+        _dbContext.ProductionPlanningHolds.Add(hold);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Created production planning hold {HoldId} for ProjectPart {ProjectPartId} on machine {MachineId}",
+            hold.Id,
+            hold.ProjectPartId,
+            hold.MachineId);
+
+        return PlanningHoldOperationResult.Success(hold);
+    }
+
+    /// <inheritdoc />
+    public async Task<PlanningHoldOperationResult> UpdatePlanningHoldAsync(
+        Guid id,
+        UpdatePlanningHoldCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        var hold = await _dbContext.ProductionPlanningHolds.FindAsync([id], cancellationToken);
+        if (hold is null)
+        {
+            return PlanningHoldOperationResult.NotFound();
+        }
+
+        if (hold.Status != PlanningHoldStatus.Active)
+        {
+            return PlanningHoldOperationResult.Failure("Only active planning holds can be updated.");
+        }
+
+        var validationError = ValidatePlanningHold(hold.ProjectId, hold.ProjectPartId, hold.Technology, command.MachineId, command.ExpiresAt);
+        if (!string.IsNullOrWhiteSpace(validationError))
+        {
+            return PlanningHoldOperationResult.Failure(validationError);
+        }
+
+        hold.MachineId = command.MachineId;
+        hold.MachineName = command.MachineName;
+        hold.QueuePosition = await ResolveHoldQueuePositionAsync(command.MachineId, command.QueuePosition, cancellationToken, hold.Id);
+        hold.ScheduledStartTime = EnsureUtc(command.ScheduledStartTime);
+        hold.ScheduledEndTime = ResolveHoldEnd(hold.ScheduledStartTime, command.ScheduledEndTime, command.SetupTimeMinutes, command.ProductionTimeMinutes);
+        hold.SetupTimeMinutes = Math.Max(0, command.SetupTimeMinutes);
+        hold.ProductionTimeMinutes = Math.Max(1, command.ProductionTimeMinutes);
+        hold.Notes = command.Notes;
+        hold.ExpiresAt = EnsureUtc(command.ExpiresAt);
+        hold.UpdatedAt = DateTime.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return PlanningHoldOperationResult.Success(hold);
+    }
+
+    /// <inheritdoc />
+    public async Task<PlanningHoldOperationResult> CancelPlanningHoldAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var hold = await _dbContext.ProductionPlanningHolds.FindAsync([id], cancellationToken);
+        if (hold is null)
+        {
+            return PlanningHoldOperationResult.NotFound();
+        }
+
+        if (hold.Status != PlanningHoldStatus.Active)
+        {
+            return PlanningHoldOperationResult.Failure("Only active planning holds can be cancelled.");
+        }
+
+        hold.Status = PlanningHoldStatus.Cancelled;
+        hold.UpdatedAt = DateTime.UtcNow;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return PlanningHoldOperationResult.Success(hold);
+    }
+
+    /// <inheritdoc />
+    public async Task<int> ExpirePlanningHoldsAsync(DateTime utcNow, CancellationToken cancellationToken = default)
+    {
+        var now = EnsureUtc(utcNow);
+        var expired = await _dbContext.ProductionPlanningHolds
+            .Where(hold => hold.Status == PlanningHoldStatus.Active && hold.ExpiresAt <= now)
+            .ToListAsync(cancellationToken);
+
+        foreach (var hold in expired)
+        {
+            hold.Status = PlanningHoldStatus.Expired;
+            hold.UpdatedAt = now;
+        }
+
+        if (expired.Count > 0)
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Expired {Count} production planning holds", expired.Count);
+        }
+
+        return expired.Count;
+    }
 
     /// <inheritdoc />
     public async Task<JobOperationResult> ReorderAsync(Guid id, int newPosition, CancellationToken cancellationToken = default)
@@ -498,6 +701,120 @@ public class JobService : IJobService
 
         var daysRemaining = (deliveryDate.Value - DateTime.UtcNow).TotalDays;
         return Math.Max(0, (int)Math.Floor(daysRemaining));
+    }
+
+    private async Task ApplyMatchingPlanningHoldAsync(
+        Job job,
+        Maliev.JobService.Domain.Models.OrderItemDto item,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        if (!item.SourceProjectId.HasValue || !item.SourceProjectPartId.HasValue)
+        {
+            return;
+        }
+
+        var hold = await _dbContext.ProductionPlanningHolds
+            .FirstOrDefaultAsync(candidate =>
+                candidate.ProjectId == item.SourceProjectId.Value &&
+                candidate.ProjectPartId == item.SourceProjectPartId.Value &&
+                candidate.Status == PlanningHoldStatus.Active &&
+                candidate.ExpiresAt > now,
+                cancellationToken);
+
+        if (hold is null)
+        {
+            return;
+        }
+
+        job.AssignedMachineId = hold.MachineId;
+        job.QueuePosition = hold.QueuePosition;
+        job.ScheduledStartTime = hold.ScheduledStartTime;
+        job.ScheduledEndTime = hold.ScheduledEndTime;
+
+        hold.Status = PlanningHoldStatus.Converted;
+        hold.ConvertedJobId = job.Id;
+        hold.UpdatedAt = now;
+    }
+
+    private async Task<int> ResolveHoldQueuePositionAsync(
+        string machineId,
+        int requestedPosition,
+        CancellationToken cancellationToken,
+        Guid? excludedHoldId = null)
+    {
+        if (requestedPosition > 0)
+        {
+            return requestedPosition;
+        }
+
+        var activeJobCount = await _dbContext.Jobs
+            .CountAsync(job =>
+                job.AssignedMachineId == machineId &&
+                (job.Status == JobStatus.Queued || job.Status == JobStatus.InProgress),
+                cancellationToken);
+
+        var holdQuery = _dbContext.ProductionPlanningHolds
+            .Where(hold => hold.MachineId == machineId && hold.Status == PlanningHoldStatus.Active);
+
+        if (excludedHoldId.HasValue)
+        {
+            holdQuery = holdQuery.Where(hold => hold.Id != excludedHoldId.Value);
+        }
+
+        var activeHoldCount = await holdQuery.CountAsync(cancellationToken);
+        return activeJobCount + activeHoldCount + 1;
+    }
+
+    private static string? ValidatePlanningHold(Guid projectId, Guid projectPartId, string technology, string machineId, DateTime expiresAt)
+    {
+        if (projectId == Guid.Empty)
+        {
+            return "ProjectId is required.";
+        }
+
+        if (projectPartId == Guid.Empty)
+        {
+            return "ProjectPartId is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(technology))
+        {
+            return "Technology is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(machineId))
+        {
+            return "MachineId is required.";
+        }
+
+        if (EnsureUtc(expiresAt) <= DateTime.UtcNow)
+        {
+            return "Expiration must be in the future.";
+        }
+
+        return null;
+    }
+
+    private static DateTime ResolveHoldEnd(DateTime start, DateTime? requestedEnd, int setupMinutes, int productionMinutes)
+    {
+        if (requestedEnd.HasValue)
+        {
+            var utcEnd = EnsureUtc(requestedEnd.Value);
+            if (utcEnd > start)
+            {
+                return utcEnd;
+            }
+        }
+
+        return start.AddMinutes(Math.Max(0, setupMinutes) + Math.Max(1, productionMinutes));
+    }
+
+    private static DateTime EnsureUtc(DateTime value)
+    {
+        return value.Kind == DateTimeKind.Utc
+            ? value
+            : DateTime.SpecifyKind(value, value.Kind == DateTimeKind.Unspecified ? DateTimeKind.Utc : value.Kind).ToUniversalTime();
     }
 
     private static (bool Valid, string Error) ValidateTransition(JobStatus currentStatus, string action)

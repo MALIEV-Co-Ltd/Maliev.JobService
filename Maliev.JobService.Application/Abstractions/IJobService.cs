@@ -122,6 +122,60 @@ public interface IJobService
     Task<Dictionary<string, int>> GetQueueDepthByTechnologyAsync(string? technology, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets production planning holds with optional project and technology filters.
+    /// </summary>
+    /// <param name="projectId">Optional source project filter.</param>
+    /// <param name="technology">Optional manufacturing technology filter.</param>
+    /// <param name="activeOnly">True to return only active non-expired holds.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The matching planning holds.</returns>
+    Task<IReadOnlyList<ProductionPlanningHold>> GetPlanningHoldsAsync(
+        Guid? projectId,
+        string? technology,
+        bool activeOnly = true,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a tentative production planning hold.
+    /// </summary>
+    /// <param name="command">The create command.</param>
+    /// <param name="createdBy">The user creating the hold.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The operation result.</returns>
+    Task<PlanningHoldOperationResult> CreatePlanningHoldAsync(
+        CreatePlanningHoldCommand command,
+        string createdBy,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates an active tentative production planning hold.
+    /// </summary>
+    /// <param name="id">The hold identifier.</param>
+    /// <param name="command">The update command.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The operation result.</returns>
+    Task<PlanningHoldOperationResult> UpdatePlanningHoldAsync(
+        Guid id,
+        UpdatePlanningHoldCommand command,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Cancels an active tentative production planning hold.
+    /// </summary>
+    /// <param name="id">The hold identifier.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The operation result.</returns>
+    Task<PlanningHoldOperationResult> CancelPlanningHoldAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Expires active planning holds whose expiration timestamp has passed.
+    /// </summary>
+    /// <param name="utcNow">The current UTC timestamp.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The number of holds expired.</returns>
+    Task<int> ExpirePlanningHoldsAsync(DateTime utcNow, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Updates the outsourcing status of all jobs belonging to a given order.
     /// </summary>
     /// <param name="orderId">The order identifier.</param>

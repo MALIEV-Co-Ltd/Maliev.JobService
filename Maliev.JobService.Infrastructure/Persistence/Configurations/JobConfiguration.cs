@@ -28,6 +28,12 @@ public class JobConfiguration : IEntityTypeConfiguration<Job>
             .HasColumnName("order_item_id")
             .IsRequired();
 
+        builder.Property(j => j.SourceProjectId)
+            .HasColumnName("source_project_id");
+
+        builder.Property(j => j.SourceProjectPartId)
+            .HasColumnName("source_project_part_id");
+
         builder.Property(j => j.MaterialId)
             .HasColumnName("material_id")
             .IsRequired();
@@ -108,6 +114,9 @@ public class JobConfiguration : IEntityTypeConfiguration<Job>
 
         builder.HasIndex(j => j.OrderId)
             .HasDatabaseName("ix_jobs_order_id");
+
+        builder.HasIndex(j => new { j.SourceProjectId, j.SourceProjectPartId })
+            .HasDatabaseName("ix_jobs_source_project_part");
 
         builder.HasIndex(j => j.AssignedMachineId)
             .HasDatabaseName("ix_jobs_assigned_machine_id");

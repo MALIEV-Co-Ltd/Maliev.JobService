@@ -13,6 +13,10 @@ public record JobDto
     public required Guid OrderId { get; init; }
     /// <summary>Gets the unique identifier of the associated order item.</summary>
     public required Guid OrderItemId { get; init; }
+    /// <summary>Gets the originating project ID when this job came from a project quotation.</summary>
+    public Guid? SourceProjectId { get; init; }
+    /// <summary>Gets the originating project part ID when this job came from a project quotation.</summary>
+    public Guid? SourceProjectPartId { get; init; }
     /// <summary>Gets the unique identifier of the material to be used.</summary>
     public required Guid MaterialId { get; init; }
     /// <summary>Gets the manufacturing technology (e.g., FDM, SLA).</summary>
@@ -58,6 +62,8 @@ public record JobDto
         JobId = job.Id,
         OrderId = job.OrderId,
         OrderItemId = job.OrderItemId,
+        SourceProjectId = job.SourceProjectId,
+        SourceProjectPartId = job.SourceProjectPartId,
         MaterialId = job.MaterialId,
         Technology = job.Technology,
         VolumeCm3 = job.VolumeCm3,

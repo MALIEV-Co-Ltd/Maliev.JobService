@@ -21,6 +21,16 @@ public class Job
     public Guid OrderItemId { get; set; }
 
     /// <summary>
+    /// Gets or sets the originating project ID when this job came from a quoted project.
+    /// </summary>
+    public Guid? SourceProjectId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the originating project part ID when this job came from a quoted project.
+    /// </summary>
+    public Guid? SourceProjectPartId { get; set; }
+
+    /// <summary>
     /// Gets or sets the material ID required for this job.
     /// </summary>
     public Guid MaterialId { get; set; }
