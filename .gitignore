@@ -57,6 +57,9 @@ nunit-*.xml
 .idea/
 .vscode/
 *.user
+*.csproj.user
+*.rsuser
+*.DotSettings.user
 *.suo
 
 # Environment
