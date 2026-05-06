@@ -195,6 +195,34 @@ public interface IJobService
         string machineId, DateTime from, DateTime to, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets scheduled production jobs and active planning holds across machines.
+    /// </summary>
+    /// <param name="from">Range start in UTC.</param>
+    /// <param name="to">Range end in UTC.</param>
+    /// <param name="machineIds">Optional machine identifiers to include.</param>
+    /// <param name="technologies">Optional manufacturing technologies to include.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The matching schedule slots.</returns>
+    Task<IReadOnlyList<ProductionScheduleSlot>> GetScheduleAsync(
+        DateTime from,
+        DateTime to,
+        IReadOnlyCollection<string>? machineIds = null,
+        IReadOnlyCollection<string>? technologies = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Moves a queued job to a specific machine schedule slot.
+    /// </summary>
+    /// <param name="id">The job identifier.</param>
+    /// <param name="command">The requested schedule move.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The operation result.</returns>
+    Task<JobOperationResult> RescheduleAsync(
+        Guid id,
+        RescheduleJobCommand command,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Reorders a queued job to a new position and cascades rescheduling.
     /// </summary>
     /// <param name="id">The job identifier.</param>

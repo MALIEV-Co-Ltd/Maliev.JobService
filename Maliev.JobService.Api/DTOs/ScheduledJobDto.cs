@@ -1,4 +1,5 @@
 using Maliev.JobService.Domain.Entities;
+using Maliev.JobService.Application.Models;
 
 namespace Maliev.JobService.Api.DTOs;
 
@@ -70,4 +71,35 @@ public record ScheduledJobDto
         ProjectPartId = hold.ProjectPartId,
         ExpiresAt = hold.ExpiresAt,
     };
+
+    /// <summary>Maps an application schedule slot to a ScheduledJobDto.</summary>
+    public static ScheduledJobDto FromScheduleSlot(ProductionScheduleSlot slot) => new()
+    {
+        JobId = slot.JobId ?? slot.HoldId ?? slot.SlotId,
+        Technology = slot.Technology,
+        ScheduledStart = slot.ScheduledStart,
+        ScheduledEnd = slot.ScheduledEnd,
+        SetupMinutes = slot.SetupMinutes,
+        PrintMinutes = slot.ProductionMinutes,
+        QueuePosition = slot.QueuePosition,
+        Status = slot.Status,
+        OrderId = slot.OrderId ?? Guid.Empty,
+        IsHold = slot.IsHold,
+        HoldId = slot.HoldId,
+        ProjectId = slot.ProjectId,
+        ProjectPartId = slot.ProjectPartId,
+        ExpiresAt = slot.ExpiresAt,
+    };
+}
+
+/// <summary>
+/// Machine-level schedule returned by the full scheduler endpoint.
+/// </summary>
+public sealed record MachineScheduleSummaryDto
+{
+    /// <summary>Gets the machine identifier or asset code.</summary>
+    public string MachineId { get; init; } = string.Empty;
+
+    /// <summary>Gets the machine schedule slots.</summary>
+    public IReadOnlyList<ScheduledJobDto> Schedule { get; init; } = [];
 }

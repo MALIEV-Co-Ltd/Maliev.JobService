@@ -905,6 +905,141 @@ public class JobServiceTests : IAsyncLifetime
         Assert.Equal(inRange.Id, result[0].Id);
     }
 
+    [Fact]
+    public async Task GetScheduleAsync_ReturnsJobsAndActiveHoldsAcrossRequestedMachines()
+    {
+        var projectId = Guid.NewGuid();
+        var partId = Guid.NewGuid();
+        var from = DateTime.UtcNow.Date;
+        var jobStart = from.AddHours(8);
+        var holdStart = from.AddHours(10);
+
+        var fdmJob = CreateTestJob(JobStatus.Queued);
+        fdmJob.AssignedMachineId = "FDM-01";
+        fdmJob.SourceProjectId = projectId;
+        fdmJob.SourceProjectPartId = partId;
+        fdmJob.ScheduledStartTime = jobStart;
+        fdmJob.ScheduledEndTime = jobStart.AddHours(2);
+        fdmJob.QueuePosition = 1;
+
+        _dbContext.Jobs.Add(fdmJob);
+        await _service.CreatePlanningHoldAsync(new CreatePlanningHoldCommand
+        {
+            ProjectId = projectId,
+            ProjectPartId = Guid.NewGuid(),
+            Technology = "CNC_MILL",
+            MachineId = "CNC-01",
+            MachineName = "HAAS VF2",
+            ScheduledStartTime = holdStart,
+            ScheduledEndTime = holdStart.AddHours(1),
+            SetupTimeMinutes = 60,
+            ProductionTimeMinutes = 60,
+            Quantity = 1,
+            ExpiresAt = DateTime.UtcNow.AddHours(72),
+        }, "planner");
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.GetScheduleAsync(
+            from,
+            from.AddDays(1),
+            ["FDM-01", "CNC-01"],
+            ["FDM", "CNC_MILL"]);
+
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, slot => slot.MachineId == "FDM-01" && slot.JobId == fdmJob.Id && !slot.IsHold);
+        var holdSlot = Assert.Single(result, slot => slot.MachineId == "CNC-01" && slot.IsHold);
+        Assert.Equal(projectId, holdSlot.ProjectId);
+        Assert.Equal("HAAS VF2", holdSlot.MachineName);
+    }
+
+    [Fact]
+    public async Task RescheduleAsync_WhenQueuedJobMovedToFreeSlot_UpdatesMachineAndTimes()
+    {
+        var job = CreateTestJob(JobStatus.Queued);
+        job.AssignedMachineId = "FDM-01";
+        job.QueuePosition = 2;
+        job.ScheduledStartTime = DateTime.UtcNow.AddHours(1);
+        job.ScheduledEndTime = DateTime.UtcNow.AddHours(3);
+        _dbContext.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        var start = DateTime.UtcNow.AddHours(5);
+        var end = start.AddHours(2);
+
+        var result = await _service.RescheduleAsync(job.Id, new RescheduleJobCommand
+        {
+            MachineId = "CNC-01",
+            ScheduledStartTime = start,
+            ScheduledEndTime = end,
+            QueuePosition = 1,
+        });
+
+        Assert.True(result.IsSuccess);
+        var persisted = await _dbContext.Jobs.FindAsync(job.Id);
+        Assert.Equal("CNC-01", persisted!.AssignedMachineId);
+        Assert.Equal(start, persisted.ScheduledStartTime);
+        Assert.Equal(end, persisted.ScheduledEndTime);
+        Assert.Equal(1, persisted.QueuePosition);
+    }
+
+    [Fact]
+    public async Task RescheduleAsync_WhenJobIsNotQueued_ReturnsFailure()
+    {
+        var job = CreateTestJob(JobStatus.InProgress);
+        job.AssignedMachineId = "FDM-01";
+        job.ScheduledStartTime = DateTime.UtcNow.AddHours(1);
+        job.ScheduledEndTime = DateTime.UtcNow.AddHours(3);
+        _dbContext.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.RescheduleAsync(job.Id, new RescheduleJobCommand
+        {
+            MachineId = "FDM-01",
+            ScheduledStartTime = DateTime.UtcNow.AddHours(4),
+            ScheduledEndTime = DateTime.UtcNow.AddHours(5),
+        });
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("queued", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RescheduleAsync_WhenTargetSlotOverlapsActiveHold_ReturnsFailure()
+    {
+        var projectId = Guid.NewGuid();
+        var start = DateTime.UtcNow.AddHours(4);
+        var job = CreateTestJob(JobStatus.Queued);
+        job.AssignedMachineId = "FDM-01";
+        job.ScheduledStartTime = DateTime.UtcNow.AddHours(1);
+        job.ScheduledEndTime = DateTime.UtcNow.AddHours(2);
+        _dbContext.Jobs.Add(job);
+
+        await _service.CreatePlanningHoldAsync(new CreatePlanningHoldCommand
+        {
+            ProjectId = projectId,
+            ProjectPartId = Guid.NewGuid(),
+            Technology = "FDM",
+            MachineId = "FDM-02",
+            ScheduledStartTime = start,
+            ScheduledEndTime = start.AddHours(2),
+            SetupTimeMinutes = 15,
+            ProductionTimeMinutes = 105,
+            Quantity = 1,
+            ExpiresAt = DateTime.UtcNow.AddHours(72),
+        }, "planner");
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.RescheduleAsync(job.Id, new RescheduleJobCommand
+        {
+            MachineId = "FDM-02",
+            ScheduledStartTime = start.AddMinutes(30),
+            ScheduledEndTime = start.AddHours(1),
+        });
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("overlap", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
     #endregion
 }
 

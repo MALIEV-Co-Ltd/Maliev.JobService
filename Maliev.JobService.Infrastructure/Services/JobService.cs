@@ -465,6 +465,187 @@ public class JobService : IJobService
         => _schedulingService.GetMachineScheduleAsync(machineId, from, to, cancellationToken);
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<ProductionScheduleSlot>> GetScheduleAsync(
+        DateTime from,
+        DateTime to,
+        IReadOnlyCollection<string>? machineIds = null,
+        IReadOnlyCollection<string>? technologies = null,
+        CancellationToken cancellationToken = default)
+    {
+        var rangeFrom = EnsureUtc(from);
+        var rangeTo = EnsureUtc(to);
+        if (rangeTo <= rangeFrom)
+        {
+            return [];
+        }
+
+        var now = DateTime.UtcNow;
+        await ExpirePlanningHoldsAsync(now, cancellationToken);
+
+        var machineFilter = NormalizeFilter(machineIds);
+        var technologyFilter = NormalizeFilter(technologies);
+
+        var jobsQuery = _dbContext.Jobs
+            .AsNoTracking()
+            .Where(job =>
+                job.AssignedMachineId != null &&
+                job.ScheduledStartTime.HasValue &&
+                job.ScheduledEndTime.HasValue &&
+                job.ScheduledEndTime.Value > rangeFrom &&
+                job.ScheduledStartTime.Value < rangeTo);
+
+        if (machineFilter.Count > 0)
+        {
+            jobsQuery = jobsQuery.Where(job => machineFilter.Contains(job.AssignedMachineId!));
+        }
+
+        if (technologyFilter.Count > 0)
+        {
+            jobsQuery = jobsQuery.Where(job => technologyFilter.Contains(job.Technology));
+        }
+
+        var jobSlots = await jobsQuery
+            .Select(job => new ProductionScheduleSlot
+            {
+                SlotId = job.Id,
+                JobId = job.Id,
+                MachineId = job.AssignedMachineId!,
+                Technology = job.Technology,
+                ScheduledStart = job.ScheduledStartTime!.Value,
+                ScheduledEnd = job.ScheduledEndTime!.Value,
+                SetupMinutes = job.SetupTimeMinutes,
+                ProductionMinutes = job.EstimatedPrintTimeMinutes,
+                QueuePosition = job.QueuePosition,
+                Status = job.Status.ToString(),
+                OrderId = job.OrderId,
+                ProjectId = job.SourceProjectId,
+                ProjectPartId = job.SourceProjectPartId,
+            })
+            .ToListAsync(cancellationToken);
+
+        var holdsQuery = _dbContext.ProductionPlanningHolds
+            .AsNoTracking()
+            .Where(hold =>
+                hold.Status == PlanningHoldStatus.Active &&
+                hold.ExpiresAt > now &&
+                hold.ScheduledEndTime > rangeFrom &&
+                hold.ScheduledStartTime < rangeTo);
+
+        if (machineFilter.Count > 0)
+        {
+            holdsQuery = holdsQuery.Where(hold => machineFilter.Contains(hold.MachineId));
+        }
+
+        if (technologyFilter.Count > 0)
+        {
+            holdsQuery = holdsQuery.Where(hold => technologyFilter.Contains(hold.Technology));
+        }
+
+        var holdSlots = await holdsQuery
+            .Select(hold => new ProductionScheduleSlot
+            {
+                SlotId = hold.Id,
+                JobId = hold.ConvertedJobId,
+                HoldId = hold.Id,
+                MachineId = hold.MachineId,
+                MachineName = hold.MachineName,
+                Technology = hold.Technology,
+                ScheduledStart = hold.ScheduledStartTime,
+                ScheduledEnd = hold.ScheduledEndTime,
+                SetupMinutes = hold.SetupTimeMinutes,
+                ProductionMinutes = hold.ProductionTimeMinutes,
+                QueuePosition = hold.QueuePosition,
+                Status = "Planning Hold",
+                ProjectId = hold.ProjectId,
+                ProjectPartId = hold.ProjectPartId,
+                ExpiresAt = hold.ExpiresAt,
+                IsHold = true,
+            })
+            .ToListAsync(cancellationToken);
+
+        return jobSlots
+            .Concat(holdSlots)
+            .OrderBy(slot => slot.MachineId, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(slot => slot.ScheduledStart)
+            .ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<JobOperationResult> RescheduleAsync(
+        Guid id,
+        RescheduleJobCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        var job = await _dbContext.Jobs.FindAsync([id], cancellationToken);
+        if (job is null)
+        {
+            return JobOperationResult.NotFound();
+        }
+
+        if (job.Status != JobStatus.Queued)
+        {
+            return JobOperationResult.Failure("Only queued jobs can be rescheduled.");
+        }
+
+        if (string.IsNullOrWhiteSpace(command.MachineId))
+        {
+            return JobOperationResult.Failure("MachineId is required.");
+        }
+
+        var start = EnsureUtc(command.ScheduledStartTime);
+        var end = command.ScheduledEndTime.HasValue
+            ? EnsureUtc(command.ScheduledEndTime.Value)
+            : start.AddMinutes(Math.Max(0, job.SetupTimeMinutes) + Math.Max(1, job.EstimatedPrintTimeMinutes));
+
+        if (start <= DateTime.UtcNow)
+        {
+            return JobOperationResult.Failure("Scheduled start must be in the future.");
+        }
+
+        if (end <= start)
+        {
+            return JobOperationResult.Failure("Scheduled end must be after scheduled start.");
+        }
+
+        if (await HasScheduleOverlapAsync(id, command.MachineId, start, end, cancellationToken))
+        {
+            return JobOperationResult.Failure("The requested schedule slot overlaps an existing job or hold.");
+        }
+
+        var oldMachineId = job.AssignedMachineId;
+        job.AssignedMachineId = command.MachineId;
+        job.ScheduledStartTime = start;
+        job.ScheduledEndTime = end;
+        if (command.QueuePosition is > 0)
+        {
+            job.QueuePosition = command.QueuePosition.Value;
+        }
+        else if (job.QueuePosition <= 0 || !string.Equals(oldMachineId, command.MachineId, StringComparison.OrdinalIgnoreCase))
+        {
+            job.QueuePosition = await ResolveJobQueuePositionAsync(command.MachineId, job.Id, cancellationToken);
+        }
+
+        job.UpdatedAt = DateTime.UtcNow;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        if (command.CascadeFollowingJobs &&
+            !string.IsNullOrWhiteSpace(oldMachineId) &&
+            !string.Equals(oldMachineId, command.MachineId, StringComparison.OrdinalIgnoreCase))
+        {
+            await _schedulingService.RescheduleQueueAsync(oldMachineId, cancellationToken);
+        }
+
+        _logger.LogInformation(
+            "Rescheduled job {JobId} on machine {MachineId}: {Start:u} - {End:u}",
+            job.Id,
+            command.MachineId,
+            start,
+            end);
+
+        return JobOperationResult.Success(job);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<ProductionPlanningHold>> GetPlanningHoldsAsync(
         Guid? projectId,
         string? technology,
@@ -764,6 +945,77 @@ public class JobService : IJobService
 
         var activeHoldCount = await holdQuery.CountAsync(cancellationToken);
         return activeJobCount + activeHoldCount + 1;
+    }
+
+    private async Task<int> ResolveJobQueuePositionAsync(
+        string machineId,
+        Guid excludedJobId,
+        CancellationToken cancellationToken)
+    {
+        var activeJobCount = await _dbContext.Jobs
+            .CountAsync(job =>
+                job.Id != excludedJobId &&
+                job.AssignedMachineId == machineId &&
+                (job.Status == JobStatus.Queued || job.Status == JobStatus.InProgress),
+                cancellationToken);
+
+        var activeHoldCount = await _dbContext.ProductionPlanningHolds
+            .CountAsync(hold =>
+                hold.MachineId == machineId &&
+                hold.Status == PlanningHoldStatus.Active,
+                cancellationToken);
+
+        return activeJobCount + activeHoldCount + 1;
+    }
+
+    private async Task<bool> HasScheduleOverlapAsync(
+        Guid jobId,
+        string machineId,
+        DateTime start,
+        DateTime end,
+        CancellationToken cancellationToken)
+    {
+        var activeStatuses = new[] { JobStatus.Queued, JobStatus.InProgress, JobStatus.Finishing };
+        var overlapsJob = await _dbContext.Jobs
+            .AsNoTracking()
+            .AnyAsync(job =>
+                job.Id != jobId &&
+                job.AssignedMachineId == machineId &&
+                activeStatuses.Contains(job.Status) &&
+                job.ScheduledStartTime.HasValue &&
+                job.ScheduledEndTime.HasValue &&
+                job.ScheduledStartTime.Value < end &&
+                job.ScheduledEndTime.Value > start,
+                cancellationToken);
+
+        if (overlapsJob)
+        {
+            return true;
+        }
+
+        var now = DateTime.UtcNow;
+        return await _dbContext.ProductionPlanningHolds
+            .AsNoTracking()
+            .AnyAsync(hold =>
+                hold.MachineId == machineId &&
+                hold.Status == PlanningHoldStatus.Active &&
+                hold.ExpiresAt > now &&
+                hold.ScheduledStartTime < end &&
+                hold.ScheduledEndTime > start,
+                cancellationToken);
+    }
+
+    private static HashSet<string> NormalizeFilter(IReadOnlyCollection<string>? values)
+    {
+        if (values is null || values.Count == 0)
+        {
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        return values
+            .SelectMany(value => value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     private static string? ValidatePlanningHold(Guid projectId, Guid projectPartId, string technology, string machineId, DateTime expiresAt)

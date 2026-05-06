@@ -340,6 +340,78 @@ public class JobController : ControllerBase
         return Ok(dtos);
     }
 
+    /// <summary>
+    /// Gets scheduled jobs and active planning holds across machines within a UTC date range.
+    /// </summary>
+    /// <param name="from">Range start (UTC). Defaults to today.</param>
+    /// <param name="to">Range end (UTC). Defaults to 7 days from now.</param>
+    /// <param name="machineIds">Optional machine identifiers or comma-separated machine identifiers.</param>
+    /// <param name="technologies">Optional technologies or comma-separated technologies.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>Schedule slots grouped by machine.</returns>
+    [HttpGet("schedule")]
+    [RequirePermission(JobPermissions.JobsRead)]
+    public async Task<ActionResult<IReadOnlyList<MachineScheduleSummaryDto>>> GetSchedule(
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        [FromQuery] string[]? machineIds,
+        [FromQuery] string[]? technologies,
+        CancellationToken cancellationToken)
+    {
+        var rangeFrom = DateTime.SpecifyKind(from ?? DateTime.UtcNow.Date, DateTimeKind.Utc);
+        var rangeTo = DateTime.SpecifyKind(to ?? DateTime.UtcNow.Date.AddDays(7), DateTimeKind.Utc);
+        var requestedMachines = ExpandQueryValues(machineIds);
+        var requestedTechnologies = ExpandQueryValues(technologies);
+
+        var slots = await _jobService.GetScheduleAsync(
+            rangeFrom,
+            rangeTo,
+            requestedMachines,
+            requestedTechnologies,
+            cancellationToken);
+
+        var results = slots
+            .GroupBy(slot => slot.MachineId, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new MachineScheduleSummaryDto
+            {
+                MachineId = group.Key,
+                Schedule = group
+                    .OrderBy(slot => slot.ScheduledStart)
+                    .Select(ScheduledJobDto.FromScheduleSlot)
+                    .ToList(),
+            })
+            .OrderBy(summary => summary.MachineId, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (var machineId in requestedMachines)
+        {
+            if (!results.Any(summary => summary.MachineId.Equals(machineId, StringComparison.OrdinalIgnoreCase)))
+            {
+                results.Add(new MachineScheduleSummaryDto { MachineId = machineId, Schedule = [] });
+            }
+        }
+
+        return Ok(results.OrderBy(summary => summary.MachineId, StringComparer.OrdinalIgnoreCase).ToList());
+    }
+
+    /// <summary>
+    /// Moves a queued job to a specific schedule slot.
+    /// </summary>
+    /// <param name="id">The job ID.</param>
+    /// <param name="request">The schedule move request.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The updated job DTO.</returns>
+    [HttpPatch("{id}/schedule")]
+    [RequirePermission(JobPermissions.JobsWrite)]
+    public async Task<ActionResult<JobDto>> Reschedule(
+        Guid id,
+        [FromBody] RescheduleJobRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _jobService.RescheduleAsync(id, request.ToCommand(), cancellationToken);
+        return ToActionResult(result);
+    }
+
     private ActionResult<ProductionPlanningHoldDto> ToPlanningHoldActionResult(Maliev.JobService.Application.Models.PlanningHoldOperationResult result)
     {
         if (result.IsNotFound)
@@ -368,6 +440,20 @@ public class JobController : ControllerBase
         }
 
         return Ok(JobDto.FromEntity(result.Job!));
+    }
+
+    private static IReadOnlyList<string> ExpandQueryValues(string[]? values)
+    {
+        if (values is null || values.Length == 0)
+        {
+            return [];
+        }
+
+        return values
+            .SelectMany(value => value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private string GetCurrentUserId()
