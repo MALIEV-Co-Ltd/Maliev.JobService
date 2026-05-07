@@ -86,7 +86,7 @@ public class SchedulingServiceIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ComputeSlotAsync_SecondJob_StartsAfterFirstEnds()
+    public async Task ComputeSlotAsync_SecondJob_StartsOneHourAfterFirstEnds()
     {
         var job1 = CreateJob();
         _db.Jobs.Add(job1);
@@ -102,7 +102,7 @@ public class SchedulingServiceIntegrationTests : IAsyncLifetime
         await _sut.ComputeSlotAsync(job2, "M1");
 
         Assert.Equal(2, job2.QueuePosition);
-        Assert.True(job2.ScheduledStartTime >= job1.ScheduledEndTime);
+        Assert.True(job2.ScheduledStartTime >= job1.ScheduledEndTime!.Value.AddHours(1));
     }
 
     [Fact]
@@ -151,8 +151,7 @@ public class SchedulingServiceIntegrationTests : IAsyncLifetime
         Assert.Equal(2, refreshed.Count);
         Assert.Equal(1, refreshed[0].QueuePosition);
         Assert.Equal(2, refreshed[1].QueuePosition);
-        // Second job should start when first ends
-        Assert.True(refreshed[1].ScheduledStartTime >= refreshed[0].ScheduledEndTime);
+        Assert.True(refreshed[1].ScheduledStartTime >= refreshed[0].ScheduledEndTime!.Value.AddHours(1));
     }
 
     [Fact]
@@ -183,10 +182,9 @@ public class SchedulingServiceIntegrationTests : IAsyncLifetime
 
         Assert.Equal(1, queued.QueuePosition);
         Assert.NotNull(queued.ScheduledStartTime);
-        // queued job should start at approximately the same moment inProgress ends
-        // (tolerance: 1s to absorb Npgsql microsecond rounding)
-        var diffMs = Math.Abs((queued.ScheduledStartTime!.Value - inProgress.ScheduledEndTime!.Value).TotalMilliseconds);
-        Assert.True(diffMs < 1000, $"ScheduledStart ({queued.ScheduledStartTime}) should be within 1s of inProgress end ({inProgress.ScheduledEndTime}), diff={diffMs}ms");
+        var expectedStart = inProgress.ScheduledEndTime!.Value.AddHours(1);
+        var diffMs = Math.Abs((queued.ScheduledStartTime!.Value - expectedStart).TotalMilliseconds);
+        Assert.True(diffMs < 1000, $"ScheduledStart ({queued.ScheduledStartTime}) should be within 1s of quiet-gap start ({expectedStart}), diff={diffMs}ms");
     }
 
     // ── ReorderJobAsync ───────────────────────────────────────────────────────

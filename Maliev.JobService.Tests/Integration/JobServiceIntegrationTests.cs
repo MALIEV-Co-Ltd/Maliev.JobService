@@ -128,6 +128,35 @@ public class JobServiceIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task RescheduleAsync_StartsWithinOneHourAfterExistingJob_ReturnsFailure()
+    {
+        var existing = CreateTestJob(JobStatus.Queued);
+        existing.AssignedMachineId = "machine-1";
+        existing.QueuePosition = 1;
+        existing.ScheduledStartTime = DateTime.UtcNow.AddHours(2);
+        existing.ScheduledEndTime = DateTime.UtcNow.AddHours(4);
+
+        var target = CreateTestJob(JobStatus.Queued);
+        target.AssignedMachineId = "machine-1";
+        target.QueuePosition = 2;
+        target.ScheduledStartTime = DateTime.UtcNow.AddHours(6);
+        target.ScheduledEndTime = DateTime.UtcNow.AddHours(8);
+
+        _dbContext!.Jobs.AddRange(existing, target);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service!.RescheduleAsync(target.Id, new()
+        {
+            MachineId = "machine-1",
+            ScheduledStartTime = existing.ScheduledEndTime.Value.AddMinutes(30),
+            ScheduledEndTime = existing.ScheduledEndTime.Value.AddHours(2)
+        });
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("quiet", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task StartAsync_WithRealDb_SetsStartedAtTimestamp()
     {
         var job = CreateTestJob(JobStatus.Queued);

@@ -11,6 +11,7 @@ namespace Maliev.JobService.Infrastructure.Services;
 /// </summary>
 public class SchedulingService : ISchedulingService
 {
+    private static readonly TimeSpan QuietGap = TimeSpan.FromHours(1);
     private readonly JobDbContext _db;
     private readonly ILogger<SchedulingService> _logger;
 
@@ -39,7 +40,7 @@ public class SchedulingService : ISchedulingService
         // Find the earliest available start time (end of the last scheduled job or now)
         var slotStart = activeJobs
             .Where(j => j.ScheduledEndTime.HasValue)
-            .Select(j => j.ScheduledEndTime!.Value)
+            .Select(j => j.ScheduledEndTime!.Value.Add(QuietGap))
             .DefaultIfEmpty(DateTime.UtcNow)
             .Max();
 
@@ -69,7 +70,7 @@ public class SchedulingService : ISchedulingService
         // The InProgress job (at most one) anchors the chain.
         // Queued jobs cascade from its scheduled end.
         var inProgress = activeJobs.FirstOrDefault(j => j.Status == JobStatus.InProgress);
-        var cursor = inProgress?.ScheduledEndTime ?? DateTime.UtcNow;
+        var cursor = inProgress?.ScheduledEndTime?.Add(QuietGap) ?? DateTime.UtcNow;
         if (cursor < DateTime.UtcNow) cursor = DateTime.UtcNow;
 
         // Compact queue positions and cascade times for Queued jobs
@@ -79,7 +80,7 @@ public class SchedulingService : ISchedulingService
             j.QueuePosition = position++;
             j.ScheduledStartTime = cursor;
             j.ScheduledEndTime = cursor.AddMinutes(j.SetupTimeMinutes + j.EstimatedPrintTimeMinutes);
-            cursor = j.ScheduledEndTime.Value;
+            cursor = j.ScheduledEndTime.Value.Add(QuietGap);
         }
 
         await _db.SaveChangesAsync(ct);

@@ -38,6 +38,7 @@ public static class JobServiceConstants
 /// </summary>
 public class JobService : IJobService
 {
+    private static readonly TimeSpan QuietGap = TimeSpan.FromHours(1);
     private readonly JobDbContext _dbContext;
     private readonly IPublishEndpoint _publishEndpoint;
     private readonly IOrderServiceClient _orderServiceClient;
@@ -607,9 +608,9 @@ public class JobService : IJobService
             return JobOperationResult.Failure("Scheduled end must be after scheduled start.");
         }
 
-        if (await HasScheduleOverlapAsync(id, command.MachineId, start, end, cancellationToken))
+        if (await HasScheduleOverlapAsync(id, null, command.MachineId, start, end, cancellationToken))
         {
-            return JobOperationResult.Failure("The requested schedule slot overlaps an existing job or hold.");
+            return JobOperationResult.Failure("The requested schedule slot must keep at least 1 hour quiet gap from existing jobs or holds.");
         }
 
         var oldMachineId = job.AssignedMachineId;
@@ -706,6 +707,18 @@ public class JobService : IJobService
             return PlanningHoldOperationResult.Failure("An active planning hold already exists for this project part.");
         }
 
+        var start = EnsureUtc(command.ScheduledStartTime);
+        var end = ResolveHoldEnd(start, command.ScheduledEndTime, command.SetupTimeMinutes, command.ProductionTimeMinutes);
+        if (end <= start)
+        {
+            return PlanningHoldOperationResult.Failure("Scheduled end must be after scheduled start.");
+        }
+
+        if (await HasScheduleOverlapAsync(null, null, command.MachineId, start, end, cancellationToken))
+        {
+            return PlanningHoldOperationResult.Failure("The requested planning hold must keep at least 1 hour quiet gap from existing jobs or holds.");
+        }
+
         var hold = new ProductionPlanningHold
         {
             Id = Guid.NewGuid(),
@@ -715,8 +728,8 @@ public class JobService : IJobService
             MachineId = command.MachineId,
             MachineName = command.MachineName,
             QueuePosition = await ResolveHoldQueuePositionAsync(command.MachineId, command.QueuePosition, cancellationToken),
-            ScheduledStartTime = EnsureUtc(command.ScheduledStartTime),
-            ScheduledEndTime = ResolveHoldEnd(EnsureUtc(command.ScheduledStartTime), command.ScheduledEndTime, command.SetupTimeMinutes, command.ProductionTimeMinutes),
+            ScheduledStartTime = start,
+            ScheduledEndTime = end,
             SetupTimeMinutes = Math.Max(0, command.SetupTimeMinutes),
             ProductionTimeMinutes = Math.Max(1, command.ProductionTimeMinutes),
             Quantity = Math.Max(1, command.Quantity),
@@ -763,11 +776,23 @@ public class JobService : IJobService
             return PlanningHoldOperationResult.Failure(validationError);
         }
 
+        var start = EnsureUtc(command.ScheduledStartTime);
+        var end = ResolveHoldEnd(start, command.ScheduledEndTime, command.SetupTimeMinutes, command.ProductionTimeMinutes);
+        if (end <= start)
+        {
+            return PlanningHoldOperationResult.Failure("Scheduled end must be after scheduled start.");
+        }
+
+        if (await HasScheduleOverlapAsync(null, hold.Id, command.MachineId, start, end, cancellationToken))
+        {
+            return PlanningHoldOperationResult.Failure("The requested planning hold must keep at least 1 hour quiet gap from existing jobs or holds.");
+        }
+
         hold.MachineId = command.MachineId;
         hold.MachineName = command.MachineName;
         hold.QueuePosition = await ResolveHoldQueuePositionAsync(command.MachineId, command.QueuePosition, cancellationToken, hold.Id);
-        hold.ScheduledStartTime = EnsureUtc(command.ScheduledStartTime);
-        hold.ScheduledEndTime = ResolveHoldEnd(hold.ScheduledStartTime, command.ScheduledEndTime, command.SetupTimeMinutes, command.ProductionTimeMinutes);
+        hold.ScheduledStartTime = start;
+        hold.ScheduledEndTime = end;
         hold.SetupTimeMinutes = Math.Max(0, command.SetupTimeMinutes);
         hold.ProductionTimeMinutes = Math.Max(1, command.ProductionTimeMinutes);
         hold.Notes = command.Notes;
@@ -969,23 +994,26 @@ public class JobService : IJobService
     }
 
     private async Task<bool> HasScheduleOverlapAsync(
-        Guid jobId,
+        Guid? excludedJobId,
+        Guid? excludedHoldId,
         string machineId,
         DateTime start,
         DateTime end,
         CancellationToken cancellationToken)
     {
+        var bufferedStart = start.Subtract(QuietGap);
+        var bufferedEnd = end.Add(QuietGap);
         var activeStatuses = new[] { JobStatus.Queued, JobStatus.InProgress, JobStatus.Finishing };
         var overlapsJob = await _dbContext.Jobs
             .AsNoTracking()
             .AnyAsync(job =>
-                job.Id != jobId &&
+                (!excludedJobId.HasValue || job.Id != excludedJobId.Value) &&
                 job.AssignedMachineId == machineId &&
                 activeStatuses.Contains(job.Status) &&
                 job.ScheduledStartTime.HasValue &&
                 job.ScheduledEndTime.HasValue &&
-                job.ScheduledStartTime.Value < end &&
-                job.ScheduledEndTime.Value > start,
+                job.ScheduledStartTime.Value < bufferedEnd &&
+                job.ScheduledEndTime.Value > bufferedStart,
                 cancellationToken);
 
         if (overlapsJob)
@@ -997,11 +1025,12 @@ public class JobService : IJobService
         return await _dbContext.ProductionPlanningHolds
             .AsNoTracking()
             .AnyAsync(hold =>
+                (!excludedHoldId.HasValue || hold.Id != excludedHoldId.Value) &&
                 hold.MachineId == machineId &&
                 hold.Status == PlanningHoldStatus.Active &&
                 hold.ExpiresAt > now &&
-                hold.ScheduledStartTime < end &&
-                hold.ScheduledEndTime > start,
+                hold.ScheduledStartTime < bufferedEnd &&
+                hold.ScheduledEndTime > bufferedStart,
                 cancellationToken);
     }
 
