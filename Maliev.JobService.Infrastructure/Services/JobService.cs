@@ -610,7 +610,7 @@ public class JobService : IJobService
 
         if (await HasScheduleOverlapAsync(id, null, command.MachineId, start, end, cancellationToken))
         {
-            return JobOperationResult.Failure("The requested schedule slot must keep at least 1 hour quiet gap from existing jobs or holds.");
+            return JobOperationResult.Failure("The requested schedule slot overlaps existing jobs or holds, or does not keep at least 1 hour quiet gap.");
         }
 
         var oldMachineId = job.AssignedMachineId;
