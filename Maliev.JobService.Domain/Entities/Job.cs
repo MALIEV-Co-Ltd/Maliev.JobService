@@ -36,6 +36,16 @@ public class Job
     public Guid MaterialId { get; set; }
 
     /// <summary>
+    /// Gets or sets the customer identifier associated with this job when known.
+    /// </summary>
+    public string? CustomerId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the customer display name captured for production context.
+    /// </summary>
+    public string? CustomerName { get; set; }
+
+    /// <summary>
     /// Gets or sets the manufacturing technology (e.g., FDM, SLA, CNC).
     /// </summary>
     public required string Technology { get; set; }
@@ -54,6 +64,11 @@ public class Job
     /// Gets or sets the ID of the machine assigned to this job.
     /// </summary>
     public string? AssignedMachineId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the operator assigned to run or monitor this job.
+    /// </summary>
+    public string? AssignedOperator { get; set; }
 
     /// <summary>
     /// Gets or sets the production priority.

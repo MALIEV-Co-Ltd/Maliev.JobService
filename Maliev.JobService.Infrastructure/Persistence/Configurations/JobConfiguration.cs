@@ -38,6 +38,14 @@ public class JobConfiguration : IEntityTypeConfiguration<Job>
             .HasColumnName("material_id")
             .IsRequired();
 
+        builder.Property(j => j.CustomerId)
+            .HasColumnName("customer_id")
+            .HasMaxLength(80);
+
+        builder.Property(j => j.CustomerName)
+            .HasColumnName("customer_name")
+            .HasMaxLength(200);
+
         builder.Property(j => j.Technology)
             .HasColumnName("technology")
             .IsRequired()
@@ -55,6 +63,10 @@ public class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.Property(j => j.AssignedMachineId)
             .HasColumnName("assigned_machine_id")
             .HasMaxLength(100);
+
+        builder.Property(j => j.AssignedOperator)
+            .HasColumnName("assigned_operator")
+            .HasMaxLength(200);
 
         builder.Property(j => j.Priority)
             .HasColumnName("priority")
@@ -114,6 +126,9 @@ public class JobConfiguration : IEntityTypeConfiguration<Job>
 
         builder.HasIndex(j => j.OrderId)
             .HasDatabaseName("ix_jobs_order_id");
+
+        builder.HasIndex(j => j.CustomerId)
+            .HasDatabaseName("ix_jobs_customer_id");
 
         builder.HasIndex(j => new { j.SourceProjectId, j.SourceProjectPartId })
             .HasDatabaseName("ix_jobs_source_project_part");

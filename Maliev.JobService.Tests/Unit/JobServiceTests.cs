@@ -262,6 +262,60 @@ public class JobServiceTests : IAsyncLifetime
 
     #endregion
 
+    #region UpdateDetailsAsync
+
+    [Fact]
+    public async Task UpdateDetailsAsync_WhenJobExists_UpdatesEditableProductionFields()
+    {
+        var materialId = Guid.NewGuid();
+        var job = CreateTestJob(JobStatus.Queued);
+        _dbContext.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.UpdateDetailsAsync(job.Id, new UpdateJobDetailsCommand
+        {
+            CustomerId = "  C-41901388  ",
+            CustomerName = " AsianRider ",
+            MaterialId = materialId,
+            AssignedOperator = " Natthapol Vanasrivilai ",
+            Priority = 1,
+        }, "planner");
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Job);
+        Assert.Equal("C-41901388", result.Job.CustomerId);
+        Assert.Equal("AsianRider", result.Job.CustomerName);
+        Assert.Equal(materialId, result.Job.MaterialId);
+        Assert.Equal("Natthapol Vanasrivilai", result.Job.AssignedOperator);
+        Assert.Equal(1, result.Job.Priority);
+
+        var persisted = await _dbContext.Jobs.FindAsync(job.Id);
+        Assert.NotNull(persisted);
+        Assert.Equal("C-41901388", persisted.CustomerId);
+        Assert.Equal("AsianRider", persisted.CustomerName);
+        Assert.Equal(materialId, persisted.MaterialId);
+        Assert.Equal("Natthapol Vanasrivilai", persisted.AssignedOperator);
+        Assert.Equal(1, persisted.Priority);
+    }
+
+    [Fact]
+    public async Task UpdateDetailsAsync_WhenMaterialIdIsEmpty_ReturnsFailure()
+    {
+        var job = CreateTestJob(JobStatus.Queued);
+        _dbContext.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.UpdateDetailsAsync(job.Id, new UpdateJobDetailsCommand
+        {
+            MaterialId = Guid.Empty,
+        }, "planner");
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("MaterialId", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    #endregion
+
     #region QueueAsync
 
     [Fact]

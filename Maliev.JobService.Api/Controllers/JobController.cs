@@ -112,6 +112,24 @@ public class JobController : ControllerBase
     }
 
     /// <summary>
+    /// Updates editable production details on a job.
+    /// </summary>
+    /// <param name="id">The job identifier.</param>
+    /// <param name="request">The requested detail changes.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The updated job DTO.</returns>
+    [HttpPatch("{id}/details")]
+    [RequirePermission(JobPermissions.JobsWrite)]
+    public async Task<ActionResult<JobDto>> UpdateDetails(
+        Guid id,
+        [FromBody] UpdateJobDetailsRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _jobService.UpdateDetailsAsync(id, request.ToCommand(), GetCurrentUserId(), cancellationToken);
+        return ToActionResult(result);
+    }
+
+    /// <summary>
     /// Gets the queue depth (number of active jobs) by technology.
     /// </summary>
     /// <param name="technology">Optional technology filter (e.g., FDM, SLA, CNC).</param>

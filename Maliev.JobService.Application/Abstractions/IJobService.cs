@@ -42,6 +42,20 @@ public interface IJobService
     Task<IReadOnlyList<Job>> GetKanbanJobsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Updates editable production details on a job.
+    /// </summary>
+    /// <param name="id">The job identifier.</param>
+    /// <param name="command">The requested detail changes.</param>
+    /// <param name="changedBy">The user performing the action.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The operation result.</returns>
+    Task<JobOperationResult> UpdateDetailsAsync(
+        Guid id,
+        UpdateJobDetailsCommand command,
+        string changedBy,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Moves a job to the queued status and assigns a machine.
     /// </summary>
     /// <param name="id">The job identifier.</param>

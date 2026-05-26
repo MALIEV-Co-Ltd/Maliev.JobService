@@ -19,6 +19,10 @@ public record JobDto
     public Guid? SourceProjectPartId { get; init; }
     /// <summary>Gets the unique identifier of the material to be used.</summary>
     public required Guid MaterialId { get; init; }
+    /// <summary>Gets the customer identifier associated with this job when known.</summary>
+    public string? CustomerId { get; init; }
+    /// <summary>Gets the customer display name captured for production context.</summary>
+    public string? CustomerName { get; init; }
     /// <summary>Gets the manufacturing technology (e.g., FDM, SLA).</summary>
     public required string Technology { get; init; }
     /// <summary>Gets the volume of the part in cubic centimeters.</summary>
@@ -27,6 +31,8 @@ public record JobDto
     public int EstimatedPrintTimeMinutes { get; init; }
     /// <summary>Gets the identifier of the machine assigned to this job.</summary>
     public string? AssignedMachineId { get; init; }
+    /// <summary>Gets the operator assigned to run or monitor this job.</summary>
+    public string? AssignedOperator { get; init; }
     /// <summary>Gets the production priority (lower values indicate higher priority).</summary>
     public int Priority { get; init; }
     /// <summary>Gets the current status of the job.</summary>
@@ -65,10 +71,13 @@ public record JobDto
         SourceProjectId = job.SourceProjectId,
         SourceProjectPartId = job.SourceProjectPartId,
         MaterialId = job.MaterialId,
+        CustomerId = job.CustomerId,
+        CustomerName = job.CustomerName,
         Technology = job.Technology,
         VolumeCm3 = job.VolumeCm3,
         EstimatedPrintTimeMinutes = job.EstimatedPrintTimeMinutes,
         AssignedMachineId = job.AssignedMachineId,
+        AssignedOperator = job.AssignedOperator,
         Priority = job.Priority,
         Status = job.Status.ToString(),
         Notes = job.Notes,

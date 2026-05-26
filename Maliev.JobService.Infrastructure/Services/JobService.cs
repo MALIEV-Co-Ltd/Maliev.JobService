@@ -135,6 +135,54 @@ public class JobService : IJobService
     }
 
     /// <inheritdoc />
+    public async Task<JobOperationResult> UpdateDetailsAsync(
+        Guid id,
+        UpdateJobDetailsCommand command,
+        string changedBy,
+        CancellationToken cancellationToken = default)
+    {
+        var job = await _dbContext.Jobs.FindAsync([id], cancellationToken);
+        if (job is null)
+        {
+            return JobOperationResult.NotFound();
+        }
+
+        if (command.MaterialId == Guid.Empty)
+        {
+            return JobOperationResult.Failure("MaterialId must be a valid material identifier.");
+        }
+
+        if (command.Priority is < 0 or > 999)
+        {
+            return JobOperationResult.Failure("Priority must be between 0 and 999.");
+        }
+
+        if (command.MaterialId.HasValue)
+        {
+            job.MaterialId = command.MaterialId.Value;
+        }
+
+        if (command.Priority.HasValue)
+        {
+            job.Priority = command.Priority.Value;
+        }
+
+        job.CustomerId = NormalizeOptionalText(command.CustomerId);
+        job.CustomerName = NormalizeOptionalText(command.CustomerName);
+        job.AssignedOperator = NormalizeOptionalText(command.AssignedOperator);
+        job.UpdatedAt = DateTime.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Updated job {JobId} production details by {ChangedBy}",
+            job.Id,
+            changedBy);
+
+        return JobOperationResult.Success(job);
+    }
+
+    /// <inheritdoc />
     public async Task<JobOperationResult> QueueAsync(
         Guid id,
         string machineId,
@@ -907,6 +955,12 @@ public class JobService : IJobService
 
         var daysRemaining = (deliveryDate.Value - DateTime.UtcNow).TotalDays;
         return Math.Max(0, (int)Math.Floor(daysRemaining));
+    }
+
+    private static string? NormalizeOptionalText(string? value)
+    {
+        var normalized = value?.Trim();
+        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
     }
 
     private async Task ApplyMatchingPlanningHoldAsync(
