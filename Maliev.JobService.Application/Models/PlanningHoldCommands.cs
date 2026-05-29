@@ -43,6 +43,13 @@ public sealed record CreatePlanningHoldCommand
 
     /// <summary>Gets the UTC expiration timestamp.</summary>
     public DateTime ExpiresAt { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the scheduler should automatically snap the hold
+    /// to the next available slot (after the quiet gap) when the requested time conflicts
+    /// with existing schedule entries.
+    /// </summary>
+    public bool AutoSnap { get; init; }
 }
 
 /// <summary>

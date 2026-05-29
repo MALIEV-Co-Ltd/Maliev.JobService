@@ -134,6 +134,9 @@ public sealed record CreateProductionPlanningHoldRequest
     /// <summary>Gets the UTC timestamp when the hold expires.</summary>
     public DateTime ExpiresAt { get; init; }
 
+    /// <summary>Gets a value indicating whether the hold should auto-snap to the next available slot when the requested time conflicts.</summary>
+    public bool AutoSnapToNextAvailable { get; init; }
+
     /// <summary>Maps this request to an application command.</summary>
     public CreatePlanningHoldCommand ToCommand() => new()
     {
@@ -149,7 +152,8 @@ public sealed record CreateProductionPlanningHoldRequest
         ProductionTimeMinutes = ProductionTimeMinutes,
         Quantity = Quantity,
         Notes = Notes,
-        ExpiresAt = ExpiresAt
+        ExpiresAt = ExpiresAt,
+        AutoSnap = AutoSnapToNextAvailable,
     };
 }
 

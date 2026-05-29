@@ -764,7 +764,22 @@ public class JobService : IJobService
 
         if (await HasScheduleOverlapAsync(null, null, command.MachineId, start, end, cancellationToken))
         {
-            return PlanningHoldOperationResult.Failure("The requested planning hold must keep at least 1 hour quiet gap from existing jobs or holds.");
+            if (command.AutoSnap)
+            {
+                var snapped = await FindNextAvailableSlotAsync(command.MachineId, start, end, cancellationToken);
+                if (snapped == null)
+                {
+                    return PlanningHoldOperationResult.Failure("No available slot found on this machine within the next 30 days.");
+                }
+
+                start = snapped.Value.start;
+                end = snapped.Value.end;
+                _logger.LogInformation("Planning hold auto-snapped to next available slot: {MachineId} {Start:O} – {End:O}", command.MachineId, start, end);
+            }
+            else
+            {
+                return PlanningHoldOperationResult.Failure("The requested planning hold must keep at least 1 hour quiet gap from existing jobs or holds.");
+            }
         }
 
         var hold = new ProductionPlanningHold
@@ -1057,23 +1072,9 @@ public class JobService : IJobService
     {
         var bufferedStart = start.Subtract(QuietGap);
         var bufferedEnd = end.Add(QuietGap);
-        var activeStatuses = new[] { JobStatus.Queued, JobStatus.InProgress, JobStatus.Finishing };
-        var overlapsJob = await _dbContext.Jobs
-            .AsNoTracking()
-            .AnyAsync(job =>
-                (!excludedJobId.HasValue || job.Id != excludedJobId.Value) &&
-                job.AssignedMachineId == machineId &&
-                activeStatuses.Contains(job.Status) &&
-                job.ScheduledStartTime.HasValue &&
-                job.ScheduledEndTime.HasValue &&
-                job.ScheduledStartTime.Value < bufferedEnd &&
-                job.ScheduledEndTime.Value > bufferedStart,
-                cancellationToken);
 
-        if (overlapsJob)
-        {
+        if (await HasJobOverlapAsync(excludedJobId, machineId, bufferedStart, bufferedEnd, cancellationToken))
             return true;
-        }
 
         var now = DateTime.UtcNow;
         return await _dbContext.ProductionPlanningHolds
@@ -1085,6 +1086,110 @@ public class JobService : IJobService
                 hold.ExpiresAt > now &&
                 hold.ScheduledStartTime < bufferedEnd &&
                 hold.ScheduledEndTime > bufferedStart,
+                cancellationToken);
+    }
+
+    /// <summary>
+    /// Scans forward from <paramref name="requestedStart"/> to find the earliest slot
+    /// where the hold can be placed without overlapping existing jobs or holds.
+    /// Returns null if no slot is found within 30 days.
+    /// </summary>
+    private async Task<(DateTime start, DateTime end)?> FindNextAvailableSlotAsync(
+        string machineId,
+        DateTime requestedStart,
+        DateTime requestedEnd,
+        CancellationToken cancellationToken)
+    {
+        var duration = requestedEnd - requestedStart;
+        var searchLimit = requestedStart.AddDays(30);
+        var activeStatuses = new[] { JobStatus.Queued, JobStatus.InProgress, JobStatus.Finishing };
+
+        // Gather all blocking schedule entries (jobs + holds) ordered by their buffered end time
+        var jobs = await _dbContext.Jobs
+            .AsNoTracking()
+            .Where(j => j.AssignedMachineId == machineId
+                     && activeStatuses.Contains(j.Status)
+                     && j.ScheduledStartTime.HasValue
+                     && j.ScheduledEndTime.HasValue
+                     && j.ScheduledEndTime.Value.Add(QuietGap) > requestedStart)
+            .OrderBy(j => j.ScheduledStartTime)
+            .Select(j => new { j.ScheduledStartTime, j.ScheduledEndTime })
+            .ToListAsync(cancellationToken);
+
+        var holds = await _dbContext.ProductionPlanningHolds
+            .AsNoTracking()
+            .Where(h => h.MachineId == machineId
+                     && h.Status == PlanningHoldStatus.Active
+                     && h.ExpiresAt > DateTime.UtcNow
+                     && h.ScheduledEndTime.Add(QuietGap) > requestedStart)
+            .OrderBy(h => h.ScheduledStartTime)
+            .Select(h => new { h.ScheduledStartTime, h.ScheduledEndTime })
+            .ToListAsync(cancellationToken);
+
+        // Merge both lists into a sorted timeline of blocking intervals (with quiet gap added)
+        var blocks = jobs
+            .Select(j => (start: j.ScheduledStartTime!.Value, end: j.ScheduledEndTime!.Value.Add(QuietGap)))
+            .Concat(holds.Select(h => (start: h.ScheduledStartTime, end: h.ScheduledEndTime.Add(QuietGap))))
+            .OrderBy(b => b.start)
+            .ToList();
+
+        // Merge overlapping blocks into contiguous busy periods
+        var merged = new List<(DateTime start, DateTime end)>();
+        foreach (var block in blocks)
+        {
+            if (merged.Count == 0 || block.start > merged[^1].end)
+            {
+                merged.Add(block);
+            }
+            else if (block.end > merged[^1].end)
+            {
+                merged[^1] = (merged[^1].start, block.end);
+            }
+        }
+
+        // Walk through gaps between merged blocks to find a slot big enough
+        var cursor = requestedStart;
+        foreach (var block in merged)
+        {
+            var candidateEnd = cursor + duration;
+            if (candidateEnd <= block.start && cursor + QuietGap <= block.start)
+            {
+                // The gap before this block is large enough
+                return (cursor, candidateEnd);
+            }
+
+            // Move cursor past this block (plus quiet gap)
+            cursor = block.end > cursor ? block.end : cursor;
+        }
+
+        // Check the gap after the last block
+        var finalEnd = cursor + duration;
+        if (finalEnd <= searchLimit)
+        {
+            return (cursor, finalEnd);
+        }
+
+        return null;
+    }
+
+    private async Task<bool> HasJobOverlapAsync(
+        Guid? excludedJobId,
+        string machineId,
+        DateTime bufferedStart,
+        DateTime bufferedEnd,
+        CancellationToken cancellationToken)
+    {
+        var activeStatuses = new[] { JobStatus.Queued, JobStatus.InProgress, JobStatus.Finishing };
+        return await _dbContext.Jobs
+            .AsNoTracking()
+            .AnyAsync(job =>
+                (!excludedJobId.HasValue || job.Id != excludedJobId.Value) &&
+                job.AssignedMachineId == machineId &&
+                activeStatuses.Contains(job.Status) &&
+                job.ScheduledStartTime.HasValue &&
+                job.ScheduledEndTime.HasValue &&
+                job.ScheduledStartTime.Value < bufferedEnd &&
+                job.ScheduledEndTime.Value > bufferedStart,
                 cancellationToken);
     }
 
