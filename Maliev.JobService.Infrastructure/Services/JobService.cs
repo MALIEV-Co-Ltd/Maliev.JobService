@@ -1111,7 +1111,7 @@ public class JobService : IJobService
                      && activeStatuses.Contains(j.Status)
                      && j.ScheduledStartTime.HasValue
                      && j.ScheduledEndTime.HasValue
-                     && j.ScheduledEndTime.Value.Add(QuietGap) > requestedStart)
+                     && j.ScheduledEndTime.Value > requestedStart.Subtract(QuietGap))
             .OrderBy(j => j.ScheduledStartTime)
             .Select(j => new { j.ScheduledStartTime, j.ScheduledEndTime })
             .ToListAsync(cancellationToken);
@@ -1121,7 +1121,7 @@ public class JobService : IJobService
             .Where(h => h.MachineId == machineId
                      && h.Status == PlanningHoldStatus.Active
                      && h.ExpiresAt > DateTime.UtcNow
-                     && h.ScheduledEndTime.Add(QuietGap) > requestedStart)
+                     && h.ScheduledEndTime > requestedStart.Subtract(QuietGap))
             .OrderBy(h => h.ScheduledStartTime)
             .Select(h => new { h.ScheduledStartTime, h.ScheduledEndTime })
             .ToListAsync(cancellationToken);
