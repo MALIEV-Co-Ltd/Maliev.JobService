@@ -1,4 +1,5 @@
 using Maliev.JobService.Infrastructure.Persistence;
+using Maliev.JobService.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -39,5 +40,27 @@ public sealed class MigrationDiscoveryTests
 
         Assert.Contains("CREATE TABLE public.production_planning_holds", script);
         Assert.DoesNotContain("\"xmin\" xid", script);
+    }
+
+    [Fact]
+    public void JobDbContext_Model_HasUniqueOrderItemJobIndex()
+    {
+        var options = new DbContextOptionsBuilder<JobDbContext>()
+            .UseNpgsql("Host=localhost;Database=jobservice;Username=postgres;Password=postgres")
+            .Options;
+
+        using var context = new JobDbContext(options);
+
+        var jobEntity = context.Model.FindEntityType(typeof(Job));
+        Assert.NotNull(jobEntity);
+
+        var orderId = jobEntity.FindProperty(nameof(Job.OrderId));
+        var orderItemId = jobEntity.FindProperty(nameof(Job.OrderItemId));
+        Assert.NotNull(orderId);
+        Assert.NotNull(orderItemId);
+
+        var index = jobEntity.FindIndex([orderId, orderItemId]);
+        Assert.NotNull(index);
+        Assert.True(index.IsUnique);
     }
 }

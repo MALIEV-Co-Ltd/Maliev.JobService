@@ -127,6 +127,10 @@ public class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.HasIndex(j => j.OrderId)
             .HasDatabaseName("ix_jobs_order_id");
 
+        builder.HasIndex(j => new { j.OrderId, j.OrderItemId })
+            .IsUnique()
+            .HasDatabaseName("ux_jobs_order_id_order_item_id");
+
         builder.HasIndex(j => j.CustomerId)
             .HasDatabaseName("ix_jobs_customer_id");
 
