@@ -669,6 +669,36 @@ public class JobServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task CreateJobsForPaidOrderAsync_WithOrderNumber_UsesOrderNumberLookup()
+    {
+        var orderId = Guid.NewGuid();
+        var orderNumber = "ORD-2026-00123";
+        var orderItems = new List<OrderItemDto>
+        {
+            new()
+            {
+                OrderItemId = Guid.NewGuid(),
+                MaterialId = Guid.NewGuid(),
+                Technology = "FDM",
+                VolumeCm3 = 100,
+                EstimatedPrintTimeMinutes = 120,
+                DeliveryDate = DateTime.UtcNow.AddDays(7),
+            },
+        };
+
+        _orderServiceClientMock
+            .Setup(c => c.GetOrderItemsAsync(orderNumber, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(orderItems);
+
+        var result = await _service.CreateJobsForPaidOrderAsync(orderId, orderNumber);
+
+        Assert.Equal(1, result);
+        _orderServiceClientMock.Verify(
+            c => c.GetOrderItemsAsync(orderNumber, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task CreateJobsForPaidOrderAsync_CalculatesPriority()
     {
         var orderId = Guid.NewGuid();

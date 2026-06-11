@@ -29,11 +29,12 @@ public class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
     public async Task Consume(ConsumeContext<OrderPaidEvent> context)
     {
         var orderId = context.Message.Payload.OrderId;
+        var orderNumber = context.Message.Payload.OrderNumber;
 
-        _logger.LogInformation("Processing OrderPaidEvent for OrderId: {OrderId}", orderId);
+        _logger.LogInformation("Processing OrderPaidEvent for OrderId: {OrderId}, OrderNumber: {OrderNumber}", orderId, orderNumber);
 
-        var createdCount = await _jobService.CreateJobsForPaidOrderAsync(orderId, context.CancellationToken);
-        _logger.LogInformation("OrderPaidEvent processing completed for OrderId: {OrderId} (created jobs: {Count})", orderId, createdCount);
+        var createdCount = await _jobService.CreateJobsForPaidOrderAsync(orderId, orderNumber, context.CancellationToken);
+        _logger.LogInformation("OrderPaidEvent processing completed for OrderId: {OrderId}, OrderNumber: {OrderNumber} (created jobs: {Count})", orderId, orderNumber, createdCount);
     }
 }
 

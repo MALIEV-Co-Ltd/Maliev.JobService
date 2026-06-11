@@ -28,11 +28,17 @@ public class OrderServiceClient : IOrderServiceClient
     /// <inheritdoc />
     public async Task<List<OrderItemDto>> GetOrderItemsAsync(Guid orderId, CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.GetAsync($"/api/orders/{orderId}/items", cancellationToken);
+        return await GetOrderItemsAsync(orderId.ToString(), cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<List<OrderItemDto>> GetOrderItemsAsync(string orderNumber, CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.GetAsync($"/order/v1/orders/{Uri.EscapeDataString(orderNumber)}/items", cancellationToken);
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            _logger.LogWarning("Order {OrderId} not found, returning empty list", orderId);
+            _logger.LogWarning("Order {OrderNumber} not found, returning empty list", orderNumber);
             return [];
         }
 

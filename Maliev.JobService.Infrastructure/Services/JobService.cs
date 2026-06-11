@@ -2,6 +2,7 @@ using Maliev.JobService.Application.Abstractions;
 using Maliev.JobService.Application.Models;
 using Maliev.JobService.Domain.Clients;
 using Maliev.JobService.Domain.Entities;
+using Maliev.JobService.Domain.Models;
 using Maliev.JobService.Infrastructure.Metrics;
 using Maliev.JobService.Infrastructure.Persistence;
 using Maliev.MessagingContracts;
@@ -401,6 +402,29 @@ public class JobService : IJobService
     /// <inheritdoc />
     public async Task<int> CreateJobsForPaidOrderAsync(Guid orderId, CancellationToken cancellationToken = default)
     {
+        return await CreateJobsForPaidOrderAsync(
+            orderId,
+            orderId.ToString(),
+            static (client, lookupOrderId, ct) => client.GetOrderItemsAsync(Guid.Parse(lookupOrderId), ct),
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CreateJobsForPaidOrderAsync(Guid orderId, string orderNumber, CancellationToken cancellationToken = default)
+    {
+        return await CreateJobsForPaidOrderAsync(
+            orderId,
+            orderNumber,
+            static (client, lookupOrderId, ct) => client.GetOrderItemsAsync(lookupOrderId, ct),
+            cancellationToken);
+    }
+
+    private async Task<int> CreateJobsForPaidOrderAsync(
+        Guid orderId,
+        string lookupOrderId,
+        Func<IOrderServiceClient, string, CancellationToken, Task<List<OrderItemDto>>> getOrderItemsAsync,
+        CancellationToken cancellationToken)
+    {
         var existingJobs = await _dbContext.Jobs.AnyAsync(j => j.OrderId == orderId, cancellationToken);
         if (existingJobs)
         {
@@ -408,10 +432,10 @@ public class JobService : IJobService
             return 0;
         }
 
-        var orderItems = await _orderServiceClient.GetOrderItemsAsync(orderId, cancellationToken);
+        var orderItems = await getOrderItemsAsync(_orderServiceClient, lookupOrderId, cancellationToken);
         if (orderItems.Count == 0)
         {
-            _logger.LogWarning("No items found for OrderId: {OrderId}", orderId);
+            _logger.LogWarning("No items found for OrderId: {OrderId} using lookup {LookupOrderId}", orderId, lookupOrderId);
             return 0;
         }
 

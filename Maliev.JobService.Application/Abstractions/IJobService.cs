@@ -128,6 +128,15 @@ public interface IJobService
     Task<int> CreateJobsForPaidOrderAsync(Guid orderId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Creates jobs for a paid order using its human-readable order number for downstream lookups.
+    /// </summary>
+    /// <param name="orderId">The paid order event identifier.</param>
+    /// <param name="orderNumber">The human-readable order number.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The number of created jobs.</returns>
+    Task<int> CreateJobsForPaidOrderAsync(Guid orderId, string orderNumber, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets the queue depth (number of active jobs) by technology.
     /// </summary>
     /// <param name="technology">The manufacturing technology filter (e.g., FDM, SLA, CNC).</param>

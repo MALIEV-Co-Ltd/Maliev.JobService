@@ -23,7 +23,7 @@ public sealed class OrderPaidEventConsumerTests
     private readonly Mock<IJobService> _jobServiceMock = new();
     private readonly Mock<ILogger<OrderPaidEventConsumer>> _loggerMock = new();
 
-    private static OrderPaidEvent BuildEvent(Guid orderId) =>
+    private static OrderPaidEvent BuildEvent(Guid orderId, string? orderNumber = null) =>
         new(
             MessageId: Guid.NewGuid(),
             MessageName: "OrderPaidEvent",
@@ -37,7 +37,7 @@ public sealed class OrderPaidEventConsumerTests
             IsPublic: false,
             Payload: new OrderPaidEventPayload(
                 OrderId: orderId,
-                OrderNumber: $"ORD-TEST-{orderId:N}"[..16],
+                OrderNumber: orderNumber ?? $"ORD-TEST-{orderId:N}"[..16],
                 PaymentId: Guid.NewGuid(),
                 PaidAmount: 1_500.00,
                 Currency: "THB",
@@ -51,19 +51,20 @@ public sealed class OrderPaidEventConsumerTests
     public async Task Consume_OrderPaidEvent_CallsCreateJobsForPaidOrder_WithCorrectOrderId()
     {
         var orderId = Guid.NewGuid();
+        var orderNumber = "ORD-2026-00123";
         _jobServiceMock
-            .Setup(s => s.CreateJobsForPaidOrderAsync(orderId, It.IsAny<CancellationToken>()))
+            .Setup(s => s.CreateJobsForPaidOrderAsync(orderId, orderNumber, It.IsAny<CancellationToken>()))
             .ReturnsAsync(2);
 
         var consumer = new OrderPaidEventConsumer(_jobServiceMock.Object, _loggerMock.Object);
         var contextMock = new Mock<ConsumeContext<OrderPaidEvent>>();
-        contextMock.Setup(c => c.Message).Returns(BuildEvent(orderId));
+        contextMock.Setup(c => c.Message).Returns(BuildEvent(orderId, orderNumber));
         contextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
 
         await consumer.Consume(contextMock.Object);
 
         _jobServiceMock.Verify(
-            s => s.CreateJobsForPaidOrderAsync(orderId, CancellationToken.None),
+            s => s.CreateJobsForPaidOrderAsync(orderId, orderNumber, CancellationToken.None),
             Times.Once);
     }
 
@@ -76,7 +77,7 @@ public sealed class OrderPaidEventConsumerTests
     {
         var orderId = Guid.NewGuid();
         _jobServiceMock
-            .Setup(s => s.CreateJobsForPaidOrderAsync(orderId, It.IsAny<CancellationToken>()))
+            .Setup(s => s.CreateJobsForPaidOrderAsync(orderId, It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(3);
 
         var consumer = new OrderPaidEventConsumer(_jobServiceMock.Object, _loggerMock.Object);
@@ -97,7 +98,7 @@ public sealed class OrderPaidEventConsumerTests
     {
         var orderId = Guid.NewGuid();
         _jobServiceMock
-            .Setup(s => s.CreateJobsForPaidOrderAsync(orderId, It.IsAny<CancellationToken>()))
+            .Setup(s => s.CreateJobsForPaidOrderAsync(orderId, It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("OrderService client unavailable"));
 
         var consumer = new OrderPaidEventConsumer(_jobServiceMock.Object, _loggerMock.Object);
@@ -118,7 +119,7 @@ public sealed class OrderPaidEventConsumerTests
     {
         var orderId = Guid.NewGuid();
         _jobServiceMock
-            .Setup(s => s.CreateJobsForPaidOrderAsync(orderId, It.IsAny<CancellationToken>()))
+            .Setup(s => s.CreateJobsForPaidOrderAsync(orderId, It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0); // idempotency: jobs already existed
 
         var consumer = new OrderPaidEventConsumer(_jobServiceMock.Object, _loggerMock.Object);
@@ -130,7 +131,7 @@ public sealed class OrderPaidEventConsumerTests
         await consumer.Consume(contextMock.Object);
 
         _jobServiceMock.Verify(
-            s => s.CreateJobsForPaidOrderAsync(orderId, CancellationToken.None),
+            s => s.CreateJobsForPaidOrderAsync(orderId, It.IsAny<string>(), CancellationToken.None),
             Times.Once);
     }
 }
