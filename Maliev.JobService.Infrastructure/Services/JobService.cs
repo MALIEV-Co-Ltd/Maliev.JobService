@@ -47,6 +47,12 @@ public class JobService : IJobService
     private readonly ITimeEstimationService _timeEstimation;
     private readonly JobMetrics _metrics;
     private readonly ILogger<JobService> _logger;
+    private static readonly string[] CompletionStatusChangedConsumers =
+    [
+        "OrderService",
+        "QualityService",
+        "NotificationService"
+    ];
 
     /// <summary>
     /// Initializes a new instance of the <see cref="JobService"/> class.
@@ -1308,13 +1314,17 @@ public class JobService : IJobService
         string changedBy,
         CancellationToken cancellationToken)
     {
+        var consumedBy = job.Status == JobStatus.Completed
+            ? CompletionStatusChangedConsumers
+            : Array.Empty<string>();
+
         await _publishEndpoint.Publish(new JobStatusChangedEvent(
             MessageId: Guid.NewGuid(),
             MessageName: nameof(JobStatusChangedEvent),
             MessageType: MessageType.Event,
             MessageVersion: "1.0.0",
             PublishedBy: "job-service",
-            ConsumedBy: Array.Empty<string>(),
+            ConsumedBy: consumedBy,
             CorrelationId: Guid.NewGuid(),
             CausationId: null,
             OccurredAtUtc: DateTimeOffset.UtcNow,

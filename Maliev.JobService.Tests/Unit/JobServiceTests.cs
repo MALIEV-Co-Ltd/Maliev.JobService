@@ -20,7 +20,7 @@ namespace Maliev.JobService.Tests.Unit;
 
 public class JobServiceTests : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = 
+    private readonly PostgreSqlContainer _postgres =
 #pragma warning disable CS0618
         new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
@@ -44,7 +44,7 @@ public class JobServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
-        
+
         var options = new DbContextOptionsBuilder<JobDbContext>()
             .UseNpgsql(_postgres.GetConnectionString())
             .Options;
@@ -55,7 +55,7 @@ public class JobServiceTests : IAsyncLifetime
         _publishEndpointMock = new Mock<IPublishEndpoint>();
         _orderServiceClientMock = new Mock<IOrderServiceClient>();
         _loggerMock = new Mock<ILogger<Infrastructure.Services.JobService>>();
-        
+
         var meterFactory = new TestMeterFactory();
         _metrics = new JobMetrics(meterFactory);
 
@@ -522,6 +522,29 @@ public class JobServiceTests : IAsyncLifetime
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Job!.CompletedAt);
         Assert.Equal(JobStatus.Completed, result.Job.Status);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_WhenValid_RoutesCompletionStatusChangeToDownstreamServices()
+    {
+        var job = CreateTestJob(JobStatus.Finishing);
+        _dbContext.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        await _service.CompleteAsync(job.Id, "scanner-operator");
+
+        _publishEndpointMock.Verify(
+            p => p.Publish(
+                It.Is<JobStatusChangedEvent>(evt =>
+                    evt.Payload.JobId == job.Id &&
+                    evt.Payload.PreviousStatus == JobStatus.Finishing.ToString() &&
+                    evt.Payload.NewStatus == JobStatus.Completed.ToString() &&
+                    evt.Payload.ChangedBy == "scanner-operator" &&
+                    evt.ConsumedBy.Contains("OrderService") &&
+                    evt.ConsumedBy.Contains("QualityService") &&
+                    evt.ConsumedBy.Contains("NotificationService")),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     #endregion
