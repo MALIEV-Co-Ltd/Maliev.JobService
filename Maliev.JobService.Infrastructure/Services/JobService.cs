@@ -87,6 +87,19 @@ public class JobService : IJobService
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<JobStatusTransitionAudit>> GetStatusTransitionAuditsAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.JobStatusTransitionAudits
+            .AsNoTracking()
+            .Where(audit => audit.JobId == id)
+            .OrderBy(audit => audit.ChangedAtUtc)
+            .ThenBy(audit => audit.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<PagedResult<Job>> GetJobsAsync(
         JobStatus? status,
         string? technology,

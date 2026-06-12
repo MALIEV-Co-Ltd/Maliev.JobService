@@ -52,6 +52,28 @@ public class JobController : ControllerBase
     }
 
     /// <summary>
+    /// Gets the durable status transition audit trail for a job.
+    /// </summary>
+    /// <param name="id">The unique identifier of the job.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The ordered status transition audit trail.</returns>
+    [HttpGet("{id}/status-audits")]
+    [RequirePermission(JobPermissions.JobsRead)]
+    public async Task<ActionResult<IReadOnlyList<JobStatusTransitionAuditDto>>> GetStatusAudits(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var job = await _jobService.GetByIdAsync(id, cancellationToken);
+        if (job is null)
+        {
+            return NotFound();
+        }
+
+        var audits = await _jobService.GetStatusTransitionAuditsAsync(id, cancellationToken);
+        return Ok(audits.Select(JobStatusTransitionAuditDto.FromEntity).ToList());
+    }
+
+    /// <summary>
     /// Retrieves a paged list of jobs with optional filtering.
     /// </summary>
     /// <param name="status">Optional status filter.</param>

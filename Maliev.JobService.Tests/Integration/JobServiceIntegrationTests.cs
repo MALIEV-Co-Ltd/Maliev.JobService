@@ -148,6 +148,28 @@ public class JobServiceIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GetStatusTransitionAuditsAsync_WithRealDb_ReturnsOrderedAuditTrail()
+    {
+        var job = CreateTestJob(JobStatus.Pending);
+        _dbContext!.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        Assert.True((await _service!.QueueAsync(job.Id, "machine-1", "queue-user")).IsSuccess);
+        Assert.True((await _service.StartAsync(job.Id, "start-user")).IsSuccess);
+
+        var audits = await _service.GetStatusTransitionAuditsAsync(job.Id);
+
+        Assert.Equal(2, audits.Count);
+        Assert.Equal(JobStatus.Pending, audits[0].PreviousStatus);
+        Assert.Equal(JobStatus.Queued, audits[0].NewStatus);
+        Assert.Equal("queue-user", audits[0].ChangedBy);
+        Assert.Equal(JobStatus.Queued, audits[1].PreviousStatus);
+        Assert.Equal(JobStatus.InProgress, audits[1].NewStatus);
+        Assert.Equal("start-user", audits[1].ChangedBy);
+        Assert.True(audits[0].ChangedAtUtc <= audits[1].ChangedAtUtc);
+    }
+
+    [Fact]
     public async Task RescheduleAsync_StartsWithinOneHourAfterExistingJob_ReturnsFailure()
     {
         var existing = CreateTestJob(JobStatus.Queued);

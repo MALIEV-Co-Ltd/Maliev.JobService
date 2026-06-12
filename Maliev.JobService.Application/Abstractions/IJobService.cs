@@ -17,6 +17,16 @@ public interface IJobService
     Task<Job?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets the durable status transition audit trail for a job.
+    /// </summary>
+    /// <param name="id">The job identifier.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The ordered audit records for the job.</returns>
+    Task<IReadOnlyList<JobStatusTransitionAudit>> GetStatusTransitionAuditsAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets a paged list of jobs with optional filters.
     /// </summary>
     /// <param name="status">The optional status filter.</param>
