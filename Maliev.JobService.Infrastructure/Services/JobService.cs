@@ -521,11 +521,12 @@ public class JobService : IJobService
                 priority);
         }
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
         foreach (var job in createdJobs)
         {
             await PublishJobCreatedAsync(job, cancellationToken);
         }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
         _metrics.RecordJobCreated(missingOrderItems.Count);
 

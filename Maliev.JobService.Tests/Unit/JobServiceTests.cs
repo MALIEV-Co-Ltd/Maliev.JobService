@@ -803,6 +803,33 @@ public class JobServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public void CreateJobsForPaidOrderAsync_PublishesJobCreatedEventsBeforeSavingForOutbox()
+    {
+        var source = File.ReadAllText(FindInfrastructureJobServiceSourcePath());
+        const string methodSignature = "private async Task<int> CreateJobsForPaidOrderAsync(";
+        var methodStart = source.IndexOf(methodSignature, StringComparison.Ordinal);
+        Assert.True(methodStart >= 0, "Could not find CreateJobsForPaidOrderAsync source.");
+
+        const string nextMethodSignature = "/// <inheritdoc />\r\n    public async Task<Dictionary<string, int>> GetQueueDepthByTechnologyAsync";
+        var methodEnd = source.IndexOf(nextMethodSignature, methodStart, StringComparison.Ordinal);
+        Assert.True(methodEnd > methodStart, "Could not isolate CreateJobsForPaidOrderAsync source.");
+
+        var methodBody = source[methodStart..methodEnd];
+        var publishIndex = methodBody.IndexOf(
+            "await PublishJobCreatedAsync(job, cancellationToken);",
+            StringComparison.Ordinal);
+        var saveIndex = methodBody.IndexOf(
+            "await _dbContext.SaveChangesAsync(cancellationToken);",
+            StringComparison.Ordinal);
+
+        Assert.True(publishIndex >= 0, "CreateJobsForPaidOrderAsync must publish JobCreatedEvent.");
+        Assert.True(saveIndex >= 0, "CreateJobsForPaidOrderAsync must save created jobs.");
+        Assert.True(
+            publishIndex < saveIndex,
+            "JobCreatedEvent must be published before SaveChangesAsync so the EF bus outbox persists it atomically with created jobs.");
+    }
+
+    [Fact]
     public async Task CreateJobsForPaidOrderAsync_WithOrderNumber_UsesOrderNumberLookup()
     {
         var orderId = Guid.NewGuid();
@@ -946,6 +973,28 @@ public class JobServiceTests : IAsyncLifetime
     }
 
     #endregion
+
+    private static string FindInfrastructureJobServiceSourcePath()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            var candidate = Path.Combine(
+                directory.FullName,
+                "Maliev.JobService.Infrastructure",
+                "Services",
+                "JobService.cs");
+
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new FileNotFoundException("Could not locate Maliev.JobService.Infrastructure/Services/JobService.cs");
+    }
 
     #region PlanningHolds
 
