@@ -633,12 +633,70 @@ public class JobServiceTests : IAsyncLifetime
         var orderId = Guid.NewGuid();
         var existingJob = CreateTestJob();
         existingJob.OrderId = orderId;
+        existingJob.OrderItemId = Guid.NewGuid();
         _dbContext.Jobs.Add(existingJob);
         await _dbContext.SaveChangesAsync();
+
+        _orderServiceClientMock
+            .Setup(c => c.GetOrderItemsAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OrderItemDto>
+            {
+                new()
+                {
+                    OrderItemId = existingJob.OrderItemId,
+                    MaterialId = existingJob.MaterialId,
+                    Technology = existingJob.Technology,
+                    VolumeCm3 = existingJob.VolumeCm3,
+                    EstimatedPrintTimeMinutes = existingJob.EstimatedPrintTimeMinutes,
+                },
+            });
 
         var result = await _service.CreateJobsForPaidOrderAsync(orderId);
 
         Assert.Equal(0, result);
+    }
+
+    [Fact]
+    public async Task CreateJobsForPaidOrderAsync_WhenSomeItemJobsExist_CreatesMissingJobs()
+    {
+        var orderId = Guid.NewGuid();
+        var existingItemId = Guid.NewGuid();
+        var missingItemId = Guid.NewGuid();
+        var existingJob = CreateTestJob();
+        existingJob.OrderId = orderId;
+        existingJob.OrderItemId = existingItemId;
+        _dbContext.Jobs.Add(existingJob);
+        await _dbContext.SaveChangesAsync();
+
+        _orderServiceClientMock
+            .Setup(c => c.GetOrderItemsAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OrderItemDto>
+            {
+                new()
+                {
+                    OrderItemId = existingItemId,
+                    MaterialId = existingJob.MaterialId,
+                    Technology = existingJob.Technology,
+                    VolumeCm3 = existingJob.VolumeCm3,
+                    EstimatedPrintTimeMinutes = existingJob.EstimatedPrintTimeMinutes,
+                },
+                new()
+                {
+                    OrderItemId = missingItemId,
+                    MaterialId = Guid.NewGuid(),
+                    Technology = "SLA",
+                    VolumeCm3 = 25,
+                    EstimatedPrintTimeMinutes = 90,
+                },
+            });
+
+        var result = await _service.CreateJobsForPaidOrderAsync(orderId);
+
+        Assert.Equal(1, result);
+        var jobs = await _dbContext.Jobs.Where(job => job.OrderId == orderId).ToListAsync();
+        Assert.Equal(2, jobs.Count);
+        Assert.Contains(jobs, job => job.OrderItemId == existingItemId);
+        Assert.Contains(jobs, job => job.OrderItemId == missingItemId);
     }
 
     [Fact]

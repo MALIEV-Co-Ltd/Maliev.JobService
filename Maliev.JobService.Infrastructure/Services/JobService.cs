@@ -431,13 +431,6 @@ public class JobService : IJobService
         Func<IOrderServiceClient, string, CancellationToken, Task<List<OrderItemDto>>> getOrderItemsAsync,
         CancellationToken cancellationToken)
     {
-        var existingJobs = await _dbContext.Jobs.AnyAsync(j => j.OrderId == orderId, cancellationToken);
-        if (existingJobs)
-        {
-            _logger.LogInformation("Jobs already exist for OrderId: {OrderId}, skipping creation", orderId);
-            return 0;
-        }
-
         var orderItems = await getOrderItemsAsync(_orderServiceClient, lookupOrderId, cancellationToken);
         if (orderItems.Count == 0)
         {
@@ -445,9 +438,24 @@ public class JobService : IJobService
             return 0;
         }
 
+        var existingOrderItemIds = await _dbContext.Jobs
+            .Where(j => j.OrderId == orderId)
+            .Select(j => j.OrderItemId)
+            .ToListAsync(cancellationToken);
+        var existingOrderItemIdSet = existingOrderItemIds.ToHashSet();
+        var missingOrderItems = orderItems
+            .Where(item => !existingOrderItemIdSet.Contains(item.OrderItemId))
+            .ToList();
+
+        if (missingOrderItems.Count == 0)
+        {
+            _logger.LogInformation("Jobs already exist for all items on OrderId: {OrderId}, skipping creation", orderId);
+            return 0;
+        }
+
         var now = DateTime.UtcNow;
 
-        foreach (var item in orderItems)
+        foreach (var item in missingOrderItems)
         {
             var priority = CalculatePriority(item.DeliveryDate);
 
@@ -486,11 +494,11 @@ public class JobService : IJobService
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
-        _metrics.RecordJobCreated(orderItems.Count);
+        _metrics.RecordJobCreated(missingOrderItems.Count);
 
-        _logger.LogInformation("Successfully created {Count} jobs for OrderId: {OrderId}", orderItems.Count, orderId);
+        _logger.LogInformation("Successfully created {Count} jobs for OrderId: {OrderId}", missingOrderItems.Count, orderId);
 
-        return orderItems.Count;
+        return missingOrderItems.Count;
     }
 
     /// <inheritdoc />
