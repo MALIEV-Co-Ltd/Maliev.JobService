@@ -134,4 +134,27 @@ public sealed class OrderPaidEventConsumerTests
             s => s.CreateJobsForPaidOrderAsync(orderId, It.IsAny<string>(), CancellationToken.None),
             Times.Once);
     }
+
+    [Fact]
+    public async Task Consume_OrderPaidEvent_WithoutJobServiceRouting_IgnoresEvent()
+    {
+        var orderId = Guid.NewGuid();
+        var consumer = new OrderPaidEventConsumer(_jobServiceMock.Object, _loggerMock.Object);
+        var contextMock = new Mock<ConsumeContext<OrderPaidEvent>>();
+        var message = BuildEvent(orderId) with
+        {
+            ConsumedBy = ["InvoiceService", "NotificationService"]
+        };
+        contextMock.Setup(c => c.Message).Returns(message);
+        contextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
+
+        await consumer.Consume(contextMock.Object);
+
+        _jobServiceMock.Verify(
+            s => s.CreateJobsForPaidOrderAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
 }

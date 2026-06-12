@@ -28,6 +28,15 @@ public class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
     /// <inheritdoc />
     public async Task Consume(ConsumeContext<OrderPaidEvent> context)
     {
+        if (!IsRoutedToJobService(context.Message))
+        {
+            _logger.LogDebug(
+                "Ignoring untargeted OrderPaidEvent for OrderId: {OrderId}, OrderNumber: {OrderNumber}",
+                context.Message.Payload.OrderId,
+                context.Message.Payload.OrderNumber);
+            return;
+        }
+
         var orderId = context.Message.Payload.OrderId;
         var orderNumber = context.Message.Payload.OrderNumber;
 
@@ -35,6 +44,12 @@ public class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
 
         var createdCount = await _jobService.CreateJobsForPaidOrderAsync(orderId, orderNumber, context.CancellationToken);
         _logger.LogInformation("OrderPaidEvent processing completed for OrderId: {OrderId}, OrderNumber: {OrderNumber} (created jobs: {Count})", orderId, orderNumber, createdCount);
+    }
+
+    private static bool IsRoutedToJobService(OrderPaidEvent message)
+    {
+        return message.ConsumedBy.Any(
+            consumer => consumer.Equals("JobService", StringComparison.OrdinalIgnoreCase));
     }
 }
 
