@@ -449,6 +449,42 @@ public class JobServiceTests : IAsyncLifetime
             Times.Once);
     }
 
+    [Theory]
+    [InlineData("QueueAsync")]
+    [InlineData("FinishAsync")]
+    [InlineData("CompleteAsync")]
+    [InlineData("CancelAsync")]
+    public void StatusTransitionMethods_PublishStatusChangedBeforeSavingForOutbox(string methodName)
+    {
+        var source = File.ReadAllText(FindInfrastructureJobServiceSourcePath());
+        var methodBody = ExtractMethodSource(
+            source,
+            $"public async Task<JobOperationResult> {methodName}");
+
+        AssertCallAppearsBeforeSaveChanges(
+            methodBody,
+            "await PublishJobStatusChangedAsync(",
+            $"{methodName} must publish JobStatusChangedEvent before SaveChangesAsync so the EF bus outbox persists status events atomically with scan/audit state.");
+    }
+
+    [Fact]
+    public void StartAsync_PublishesStartedAndStatusChangedBeforeSavingForOutbox()
+    {
+        var source = File.ReadAllText(FindInfrastructureJobServiceSourcePath());
+        var methodBody = ExtractMethodSource(
+            source,
+            "public async Task<JobOperationResult> StartAsync");
+
+        AssertCallAppearsBeforeSaveChanges(
+            methodBody,
+            "await _publishEndpoint.Publish(new JobStartedEvent(",
+            "StartAsync must publish JobStartedEvent before SaveChangesAsync so the EF bus outbox persists it atomically with started job state.");
+        AssertCallAppearsBeforeSaveChanges(
+            methodBody,
+            "await PublishJobStatusChangedAsync(",
+            "StartAsync must publish JobStatusChangedEvent before SaveChangesAsync so the EF bus outbox persists it atomically with started job state.");
+    }
+
     #endregion
 
     #region FinishAsync
@@ -807,25 +843,11 @@ public class JobServiceTests : IAsyncLifetime
     {
         var source = File.ReadAllText(FindInfrastructureJobServiceSourcePath());
         const string methodSignature = "private async Task<int> CreateJobsForPaidOrderAsync(";
-        var methodStart = source.IndexOf(methodSignature, StringComparison.Ordinal);
-        Assert.True(methodStart >= 0, "Could not find CreateJobsForPaidOrderAsync source.");
+        var methodBody = ExtractMethodSource(source, methodSignature);
 
-        const string nextMethodSignature = "/// <inheritdoc />\r\n    public async Task<Dictionary<string, int>> GetQueueDepthByTechnologyAsync";
-        var methodEnd = source.IndexOf(nextMethodSignature, methodStart, StringComparison.Ordinal);
-        Assert.True(methodEnd > methodStart, "Could not isolate CreateJobsForPaidOrderAsync source.");
-
-        var methodBody = source[methodStart..methodEnd];
-        var publishIndex = methodBody.IndexOf(
+        AssertCallAppearsBeforeSaveChanges(
+            methodBody,
             "await PublishJobCreatedAsync(job, cancellationToken);",
-            StringComparison.Ordinal);
-        var saveIndex = methodBody.IndexOf(
-            "await _dbContext.SaveChangesAsync(cancellationToken);",
-            StringComparison.Ordinal);
-
-        Assert.True(publishIndex >= 0, "CreateJobsForPaidOrderAsync must publish JobCreatedEvent.");
-        Assert.True(saveIndex >= 0, "CreateJobsForPaidOrderAsync must save created jobs.");
-        Assert.True(
-            publishIndex < saveIndex,
             "JobCreatedEvent must be published before SaveChangesAsync so the EF bus outbox persists it atomically with created jobs.");
     }
 
@@ -994,6 +1016,49 @@ public class JobServiceTests : IAsyncLifetime
         }
 
         throw new FileNotFoundException("Could not locate Maliev.JobService.Infrastructure/Services/JobService.cs");
+    }
+
+    private static string ExtractMethodSource(string source, string methodSignature)
+    {
+        var methodStart = source.IndexOf(methodSignature, StringComparison.Ordinal);
+        Assert.True(methodStart >= 0, $"Could not find {methodSignature} source.");
+
+        var openingBrace = source.IndexOf('{', methodStart);
+        Assert.True(openingBrace > methodStart, $"Could not find opening brace for {methodSignature}.");
+
+        var depth = 0;
+        for (var index = openingBrace; index < source.Length; index++)
+        {
+            if (source[index] == '{')
+            {
+                depth++;
+            }
+            else if (source[index] == '}')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    return source[methodStart..(index + 1)];
+                }
+            }
+        }
+
+        throw new InvalidOperationException($"Could not isolate {methodSignature} source.");
+    }
+
+    private static void AssertCallAppearsBeforeSaveChanges(
+        string methodBody,
+        string expectedCall,
+        string failureMessage)
+    {
+        var callIndex = methodBody.IndexOf(expectedCall, StringComparison.Ordinal);
+        var saveIndex = methodBody.IndexOf(
+            "await _dbContext.SaveChangesAsync(cancellationToken);",
+            StringComparison.Ordinal);
+
+        Assert.True(callIndex >= 0, $"Expected call not found: {expectedCall}");
+        Assert.True(saveIndex >= 0, "Expected SaveChangesAsync call not found.");
+        Assert.True(callIndex < saveIndex, failureMessage);
     }
 
     #region PlanningHolds

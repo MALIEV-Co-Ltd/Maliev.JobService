@@ -235,8 +235,8 @@ public class JobService : IJobService
         AddStatusTransitionAudit(job, previousStatus, changedBy);
 
         await _schedulingService.ComputeSlotAsync(job, machineId, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
         await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
         _metrics.RecordTransition(previousStatus.ToString(), job.Status.ToString(), DateTime.UtcNow - transitionStart);
         _logger.LogInformation("Job {JobId} queued on machine {MachineId}", job.Id, machineId);
@@ -267,7 +267,6 @@ public class JobService : IJobService
         job.UpdatedAt = DateTime.UtcNow;
         AddStatusTransitionAudit(job, previousStatus, changedBy);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
         await _publishEndpoint.Publish(new JobStartedEvent(
             MessageId: Guid.NewGuid(),
             MessageName: nameof(JobStartedEvent),
@@ -291,6 +290,7 @@ public class JobService : IJobService
             }), cancellationToken);
 
         await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
         _metrics.RecordTransition(previousStatus.ToString(), job.Status.ToString(), DateTime.UtcNow - transitionStart);
         _logger.LogInformation("Job {JobId} started at {StartedAt}", job.Id, job.StartedAt);
@@ -320,8 +320,8 @@ public class JobService : IJobService
         job.UpdatedAt = DateTime.UtcNow;
         AddStatusTransitionAudit(job, previousStatus, changedBy);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
         await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
         _metrics.RecordTransition(previousStatus.ToString(), job.Status.ToString(), DateTime.UtcNow - transitionStart);
         _logger.LogInformation("Job {JobId} moved to finishing", job.Id);
@@ -353,8 +353,8 @@ public class JobService : IJobService
         job.UpdatedAt = DateTime.UtcNow;
         AddStatusTransitionAudit(job, previousStatus, changedBy);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
         await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
         if (!string.IsNullOrEmpty(completedMachineId))
             await _schedulingService.RescheduleQueueAsync(completedMachineId, cancellationToken);
@@ -387,8 +387,8 @@ public class JobService : IJobService
         job.UpdatedAt = DateTime.UtcNow;
         AddStatusTransitionAudit(job, previousStatus, changedBy, reason);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
         await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
         if (!string.IsNullOrEmpty(cancelledMachineId))
             await _schedulingService.RescheduleQueueAsync(cancelledMachineId, cancellationToken);
