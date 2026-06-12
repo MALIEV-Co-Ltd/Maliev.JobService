@@ -14,6 +14,17 @@ public class JobLogicTests
         Assert.DoesNotContain("ready for shipping", source, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void CreateJobsForPaidOrderAsync_RequiresLockedProductionSnapshots()
+    {
+        var source = File.ReadAllText(FindRepoFile("Maliev.JobService.Infrastructure", "Services", "JobService.cs"));
+        var methodBody = ExtractMethodSource(source, "private async Task<int> CreateJobsForPaidOrderAsync(");
+
+        Assert.Contains("ValidateLockedProductionSnapshots(item);", methodBody, StringComparison.Ordinal);
+        Assert.Contains("MaterialSnapshotJson is required", source, StringComparison.Ordinal);
+        Assert.Contains("ConfigurationSnapshotJson is required", source, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(JobStatus.Pending, "queue", true)]
     [InlineData(JobStatus.Pending, "start", true)]
@@ -101,5 +112,33 @@ public class JobLogicTests
         }
 
         throw new FileNotFoundException("Could not locate repository file.", Path.Combine(pathParts));
+    }
+
+    private static string ExtractMethodSource(string source, string methodSignature)
+    {
+        var methodStart = source.IndexOf(methodSignature, StringComparison.Ordinal);
+        Assert.True(methodStart >= 0, $"Could not find {methodSignature} source.");
+
+        var openingBrace = source.IndexOf('{', methodStart);
+        Assert.True(openingBrace > methodStart, $"Could not find opening brace for {methodSignature}.");
+
+        var depth = 0;
+        for (var index = openingBrace; index < source.Length; index++)
+        {
+            if (source[index] == '{')
+            {
+                depth++;
+            }
+            else if (source[index] == '}')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    return source[methodStart..(index + 1)];
+                }
+            }
+        }
+
+        throw new InvalidOperationException($"Could not isolate {methodSignature} source.");
     }
 }

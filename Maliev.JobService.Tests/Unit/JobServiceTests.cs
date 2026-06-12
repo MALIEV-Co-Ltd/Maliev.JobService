@@ -733,6 +733,8 @@ public class JobServiceTests : IAsyncLifetime
                 {
                     OrderItemId = existingJob.OrderItemId,
                     MaterialId = existingJob.MaterialId,
+                    MaterialSnapshotJson = LockedMaterialSnapshot(),
+                    ConfigurationSnapshotJson = LockedConfigurationSnapshot(),
                     Technology = existingJob.Technology,
                     VolumeCm3 = existingJob.VolumeCm3,
                     EstimatedPrintTimeMinutes = existingJob.EstimatedPrintTimeMinutes,
@@ -764,6 +766,8 @@ public class JobServiceTests : IAsyncLifetime
                 {
                     OrderItemId = existingItemId,
                     MaterialId = existingJob.MaterialId,
+                    MaterialSnapshotJson = LockedMaterialSnapshot(),
+                    ConfigurationSnapshotJson = LockedConfigurationSnapshot(),
                     Technology = existingJob.Technology,
                     VolumeCm3 = existingJob.VolumeCm3,
                     EstimatedPrintTimeMinutes = existingJob.EstimatedPrintTimeMinutes,
@@ -772,6 +776,8 @@ public class JobServiceTests : IAsyncLifetime
                 {
                     OrderItemId = missingItemId,
                     MaterialId = Guid.NewGuid(),
+                    MaterialSnapshotJson = LockedMaterialSnapshot(),
+                    ConfigurationSnapshotJson = LockedConfigurationSnapshot(),
                     Technology = "SLA",
                     VolumeCm3 = 25,
                     EstimatedPrintTimeMinutes = 90,
@@ -809,6 +815,8 @@ public class JobServiceTests : IAsyncLifetime
             {
                 OrderItemId = Guid.NewGuid(),
                 MaterialId = Guid.NewGuid(),
+                MaterialSnapshotJson = LockedMaterialSnapshot(),
+                ConfigurationSnapshotJson = LockedConfigurationSnapshot(),
                 Technology = "FDM",
                 VolumeCm3 = 100,
                 EstimatedPrintTimeMinutes = 120,
@@ -818,6 +826,8 @@ public class JobServiceTests : IAsyncLifetime
             {
                 OrderItemId = Guid.NewGuid(),
                 MaterialId = Guid.NewGuid(),
+                MaterialSnapshotJson = LockedMaterialSnapshot(),
+                ConfigurationSnapshotJson = LockedConfigurationSnapshot(),
                 Technology = "SLA",
                 VolumeCm3 = 50,
                 EstimatedPrintTimeMinutes = 60,
@@ -849,6 +859,8 @@ public class JobServiceTests : IAsyncLifetime
             {
                 OrderItemId = firstItemId,
                 MaterialId = Guid.NewGuid(),
+                MaterialSnapshotJson = LockedMaterialSnapshot(),
+                ConfigurationSnapshotJson = LockedConfigurationSnapshot(),
                 Technology = "FDM",
                 VolumeCm3 = 100,
                 EstimatedPrintTimeMinutes = 120,
@@ -857,6 +869,8 @@ public class JobServiceTests : IAsyncLifetime
             {
                 OrderItemId = secondItemId,
                 MaterialId = Guid.NewGuid(),
+                MaterialSnapshotJson = LockedMaterialSnapshot(),
+                ConfigurationSnapshotJson = LockedConfigurationSnapshot(),
                 Technology = "SLA",
                 VolumeCm3 = 50,
                 EstimatedPrintTimeMinutes = 60,
@@ -914,6 +928,8 @@ public class JobServiceTests : IAsyncLifetime
             {
                 OrderItemId = Guid.NewGuid(),
                 MaterialId = Guid.NewGuid(),
+                MaterialSnapshotJson = LockedMaterialSnapshot(),
+                ConfigurationSnapshotJson = LockedConfigurationSnapshot(),
                 Technology = "FDM",
                 VolumeCm3 = 100,
                 EstimatedPrintTimeMinutes = 120,
@@ -979,6 +995,8 @@ public class JobServiceTests : IAsyncLifetime
             {
                 OrderItemId = Guid.NewGuid(),
                 MaterialId = Guid.NewGuid(),
+                MaterialSnapshotJson = LockedMaterialSnapshot(),
+                ConfigurationSnapshotJson = LockedConfigurationSnapshot(),
                 CustomerId = "CUST-PROD-001",
                 CustomerName = "Production Buyer Ltd.",
                 Technology = "SLS",
@@ -1011,6 +1029,8 @@ public class JobServiceTests : IAsyncLifetime
             {
                 OrderItemId = Guid.NewGuid(),
                 MaterialId = Guid.NewGuid(),
+                MaterialSnapshotJson = LockedMaterialSnapshot(),
+                ConfigurationSnapshotJson = LockedConfigurationSnapshot(),
                 Technology = "FDM",
                 VolumeCm3 = 100,
                 EstimatedPrintTimeMinutes = 120,
@@ -1037,8 +1057,10 @@ public class JobServiceTests : IAsyncLifetime
             .ReturnsAsync(new List<OrderItemDto>
             {
                 new() { OrderItemId = Guid.NewGuid(), MaterialId = Guid.NewGuid(),
+                        MaterialSnapshotJson = LockedMaterialSnapshot(), ConfigurationSnapshotJson = LockedConfigurationSnapshot(),
                         Technology = "FDM", VolumeCm3 = 10, EstimatedPrintTimeMinutes = 0 },
                 new() { OrderItemId = Guid.NewGuid(), MaterialId = Guid.NewGuid(),
+                        MaterialSnapshotJson = LockedMaterialSnapshot(), ConfigurationSnapshotJson = LockedConfigurationSnapshot(),
                         Technology = "CNC", VolumeCm3 = 10, EstimatedPrintTimeMinutes = 0 },
             });
 
@@ -1063,6 +1085,8 @@ public class JobServiceTests : IAsyncLifetime
             {
                 OrderItemId = Guid.NewGuid(),
                 MaterialId = Guid.NewGuid(),
+                MaterialSnapshotJson = LockedMaterialSnapshot(),
+                ConfigurationSnapshotJson = LockedConfigurationSnapshot(),
                 Technology = "FDM",
                 VolumeCm3 = 100,
                 EstimatedPrintTimeMinutes = 120,
@@ -1263,6 +1287,8 @@ public class JobServiceTests : IAsyncLifetime
                     SourceProjectId = projectId,
                     SourceProjectPartId = partId,
                     MaterialId = Guid.NewGuid(),
+                    MaterialSnapshotJson = LockedMaterialSnapshot(),
+                    ConfigurationSnapshotJson = LockedConfigurationSnapshot(),
                     Technology = "FDM",
                     VolumeCm3 = 10,
                     Quantity = 2,
@@ -1492,6 +1518,10 @@ public class JobServiceTests : IAsyncLifetime
     }
 
     #endregion
+
+    private static string LockedMaterialSnapshot() => """{"materialId":"locked-test-material"}""";
+
+    private static string LockedConfigurationSnapshot() => """{"configurationId":"locked-test-configuration"}""";
 }
 
 internal sealed class TestMeterFactory : IMeterFactory

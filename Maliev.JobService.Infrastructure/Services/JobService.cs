@@ -494,6 +494,8 @@ public class JobService : IJobService
 
         foreach (var item in missingOrderItems)
         {
+            ValidateLockedProductionSnapshots(item);
+
             var priority = CalculatePriority(item.DeliveryDate);
 
             var quantity = Math.Max(1, item.Quantity);
@@ -1335,6 +1337,19 @@ public class JobService : IJobService
         }
 
         return start.AddMinutes(Math.Max(0, setupMinutes) + Math.Max(1, productionMinutes));
+    }
+
+    private static void ValidateLockedProductionSnapshots(Maliev.JobService.Domain.Models.OrderItemDto item)
+    {
+        if (string.IsNullOrWhiteSpace(item.MaterialSnapshotJson))
+        {
+            throw new InvalidOperationException($"MaterialSnapshotJson is required before creating a production job for order item {item.OrderItemId}.");
+        }
+
+        if (string.IsNullOrWhiteSpace(item.ConfigurationSnapshotJson))
+        {
+            throw new InvalidOperationException($"ConfigurationSnapshotJson is required before creating a production job for order item {item.OrderItemId}.");
+        }
     }
 
     private static DateTime EnsureUtc(DateTime value)
