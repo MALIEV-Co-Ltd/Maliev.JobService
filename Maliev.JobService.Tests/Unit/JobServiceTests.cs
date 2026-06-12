@@ -423,6 +423,29 @@ public class JobServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task StartAsync_WhenValid_RoutesProductionStartToOrderService()
+    {
+        var job = CreateTestJob(JobStatus.Queued);
+        job.OrderNumber = "ORD-2026-00461";
+        _dbContext.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        await _service.StartAsync(job.Id, "scanner-operator");
+
+        _publishEndpointMock.Verify(
+            p => p.Publish(
+                It.Is<JobStatusChangedEvent>(evt =>
+                    evt.Payload.JobId == job.Id &&
+                    evt.Payload.PreviousStatus == JobStatus.Queued.ToString() &&
+                    evt.Payload.NewStatus == JobStatus.InProgress.ToString() &&
+                    evt.Payload.OrderNumber == job.OrderNumber &&
+                    evt.Payload.ChangedBy == "scanner-operator" &&
+                    evt.ConsumedBy.Contains("OrderService")),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task StartAsync_WhenValid_SetsStartedAt()
     {
         var job = CreateTestJob(JobStatus.Pending);

@@ -53,6 +53,10 @@ public class JobService : IJobService
         "QualityService",
         "NotificationService"
     ];
+    private static readonly string[] ProductionStartStatusChangedConsumers =
+    [
+        "OrderService"
+    ];
     private static readonly string[] JobCreatedConsumers =
     [
         "NotificationService",
@@ -1368,6 +1372,8 @@ public class JobService : IJobService
     {
         var consumedBy = job.Status == JobStatus.Completed && orderProductionCompleted
             ? CompletionStatusChangedConsumers
+            : job.Status == JobStatus.InProgress
+                ? ProductionStartStatusChangedConsumers
             : Array.Empty<string>();
 
         await _publishEndpoint.Publish(new JobStatusChangedEvent(
