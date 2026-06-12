@@ -5,6 +5,15 @@ namespace Maliev.JobService.Tests.Unit;
 
 public class JobLogicTests
 {
+    [Fact]
+    public void CompletedStatusDocumentation_RoutesProductionCompletionToQualityReview()
+    {
+        var source = File.ReadAllText(FindRepoFile("Maliev.JobService.Domain", "Entities", "JobStatus.cs"));
+
+        Assert.Contains("quality review", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ready for shipping", source, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Theory]
     [InlineData(JobStatus.Pending, "queue", true)]
     [InlineData(JobStatus.Pending, "start", true)]
@@ -37,7 +46,7 @@ public class JobLogicTests
     {
         // Arrange
         var futureDate = DateTime.UtcNow.AddDays(5).AddMinutes(1);
-        
+
         // Act
         var result = CalculatePriority(futureDate);
 
@@ -50,7 +59,7 @@ public class JobLogicTests
     {
         // Arrange
         var pastDate = DateTime.UtcNow.AddDays(-5);
-        
+
         // Act
         var result = CalculatePriority(pastDate);
 
@@ -72,8 +81,25 @@ public class JobLogicTests
     {
         if (!deliveryDate.HasValue)
             return 999;
-            
+
         var daysRemaining = (deliveryDate.Value - DateTime.UtcNow).TotalDays;
         return Math.Max(0, (int)Math.Floor(daysRemaining));
+    }
+
+    private static string FindRepoFile(params string[] pathParts)
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            var candidate = Path.Combine([current.FullName, .. pathParts]);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new FileNotFoundException("Could not locate repository file.", Path.Combine(pathParts));
     }
 }

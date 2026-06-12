@@ -26,7 +26,7 @@ public enum JobStatus
     Finishing = 3,
 
     /// <summary>
-    /// The job is finished and ready for shipping.
+    /// The job's production work is complete and waiting for quality review.
     /// </summary>
     Completed = 4,
 

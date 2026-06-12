@@ -580,7 +580,9 @@ public class JobServiceTests : IAsyncLifetime
                     evt.Payload.ChangedBy == "scanner-operator" &&
                     evt.ConsumedBy.Contains("OrderService") &&
                     evt.ConsumedBy.Contains("QualityService") &&
-                    evt.ConsumedBy.Contains("NotificationService")),
+                    evt.ConsumedBy.Contains("NotificationService") &&
+                    !evt.ConsumedBy.Contains("DeliveryService") &&
+                    !evt.ConsumedBy.Contains("ShippingService")),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
