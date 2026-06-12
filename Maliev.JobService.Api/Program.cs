@@ -6,6 +6,7 @@ using Maliev.JobService.Infrastructure.Metrics;
 using Maliev.JobService.Infrastructure.Persistence;
 using Maliev.JobService.Infrastructure.Data.SeedData;
 using Maliev.JobService.Infrastructure.Services;
+using MassTransit;
 
 // Initialize bootstrap logging
 using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
@@ -34,6 +35,12 @@ try
     // MassTransit with RabbitMq
     builder.AddMassTransitWithRabbitMq(configure: x =>
     {
+        x.AddEntityFrameworkOutbox<JobDbContext>(o =>
+        {
+            o.UsePostgres();
+            o.UseBusOutbox();
+        });
+
         x.AddConsumer<OrderPaidEventConsumer>();
         x.AddConsumer<OrderOutsourcingChangedConsumer>();
     });

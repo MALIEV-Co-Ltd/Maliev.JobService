@@ -63,4 +63,21 @@ public sealed class MigrationDiscoveryTests
         Assert.NotNull(index);
         Assert.True(index.IsUnique);
     }
+
+    [Fact]
+    public void JobDbContext_Model_IncludesMassTransitOutboxEntities()
+    {
+        var options = new DbContextOptionsBuilder<JobDbContext>()
+            .UseNpgsql("Host=localhost;Database=jobservice;Username=postgres;Password=postgres")
+            .Options;
+
+        using var context = new JobDbContext(options);
+        var entityNames = context.Model.GetEntityTypes()
+            .Select(entity => entity.ClrType.FullName)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.Contains("MassTransit.EntityFrameworkCoreIntegration.InboxState", entityNames);
+        Assert.Contains("MassTransit.EntityFrameworkCoreIntegration.OutboxMessage", entityNames);
+        Assert.Contains("MassTransit.EntityFrameworkCoreIntegration.OutboxState", entityNames);
+    }
 }

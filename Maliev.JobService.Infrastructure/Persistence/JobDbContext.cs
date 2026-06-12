@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Maliev.JobService.Infrastructure.Persistence.Configurations;
 using Maliev.JobService.Domain.Entities;
+using MassTransit;
 
 namespace Maliev.JobService.Infrastructure.Persistence;
 
@@ -38,5 +39,9 @@ public class JobDbContext : DbContext
         modelBuilder.ApplyConfiguration(new JobConfiguration());
         modelBuilder.ApplyConfiguration(new JobStatusTransitionAuditConfiguration());
         modelBuilder.ApplyConfiguration(new ProductionPlanningHoldConfiguration());
+
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddOutboxStateEntity();
     }
 }
