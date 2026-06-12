@@ -53,6 +53,11 @@ public class JobService : IJobService
         "QualityService",
         "NotificationService"
     ];
+    private static readonly string[] JobCreatedConsumers =
+    [
+        "NotificationService",
+        "MaterialService"
+    ];
 
     /// <summary>
     /// Initializes a new instance of the <see cref="JobService"/> class.
@@ -455,6 +460,8 @@ public class JobService : IJobService
 
         var now = DateTime.UtcNow;
 
+        var createdJobs = new List<Job>(missingOrderItems.Count);
+
         foreach (var item in missingOrderItems)
         {
             var priority = CalculatePriority(item.DeliveryDate);
@@ -486,6 +493,7 @@ public class JobService : IJobService
 
             await ApplyMatchingPlanningHoldAsync(job, item, now, cancellationToken);
             _dbContext.Jobs.Add(job);
+            createdJobs.Add(job);
 
             _logger.LogInformation(
                 "Created job {JobId} for OrderId: {OrderId}, OrderItemId: {OrderItemId}, Priority: {Priority}",
@@ -496,6 +504,11 @@ public class JobService : IJobService
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        foreach (var job in createdJobs)
+        {
+            await PublishJobCreatedAsync(job, cancellationToken);
+        }
+
         _metrics.RecordJobCreated(missingOrderItems.Count);
 
         _logger.LogInformation("Successfully created {Count} jobs for OrderId: {OrderId}", missingOrderItems.Count, orderId);
@@ -1350,6 +1363,29 @@ public class JobService : IJobService
                 ChangedAt = DateTime.UtcNow,
                 ChangedBy = changedBy,
             }),
+            cancellationToken);
+    }
+
+    private async Task PublishJobCreatedAsync(Job job, CancellationToken cancellationToken)
+    {
+        await _publishEndpoint.Publish(new JobCreatedEvent(
+            MessageId: Guid.NewGuid(),
+            MessageName: nameof(JobCreatedEvent),
+            MessageType: MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy: "job-service",
+            ConsumedBy: JobCreatedConsumers,
+            CorrelationId: Guid.NewGuid(),
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
+            Payload: new JobCreatedEventPayload(
+                JobId: job.Id,
+                OrderId: job.OrderId,
+                OrderItemId: job.OrderItemId,
+                ProcessType: job.Technology,
+                JobNumber: $"JOB-{job.Id:N}",
+                CreatedAt: new DateTimeOffset(DateTime.SpecifyKind(job.CreatedAt, DateTimeKind.Utc)))),
             cancellationToken);
     }
 }

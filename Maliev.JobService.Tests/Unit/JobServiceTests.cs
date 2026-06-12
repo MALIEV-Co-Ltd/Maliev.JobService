@@ -750,6 +750,59 @@ public class JobServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task CreateJobsForPaidOrderAsync_WhenValid_PublishesJobCreatedEvents()
+    {
+        var orderId = Guid.NewGuid();
+        var firstItemId = Guid.NewGuid();
+        var secondItemId = Guid.NewGuid();
+        var orderItems = new List<OrderItemDto>
+        {
+            new()
+            {
+                OrderItemId = firstItemId,
+                MaterialId = Guid.NewGuid(),
+                Technology = "FDM",
+                VolumeCm3 = 100,
+                EstimatedPrintTimeMinutes = 120,
+            },
+            new()
+            {
+                OrderItemId = secondItemId,
+                MaterialId = Guid.NewGuid(),
+                Technology = "SLA",
+                VolumeCm3 = 50,
+                EstimatedPrintTimeMinutes = 60,
+            },
+        };
+
+        _orderServiceClientMock
+            .Setup(c => c.GetOrderItemsAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(orderItems);
+
+        var result = await _service.CreateJobsForPaidOrderAsync(orderId);
+
+        Assert.Equal(2, result);
+        _publishEndpointMock.Verify(
+            p => p.Publish(
+                It.Is<JobCreatedEvent>(evt =>
+                    evt.PublishedBy == "job-service" &&
+                    evt.ConsumedBy.Contains("NotificationService") &&
+                    evt.Payload.OrderId == orderId &&
+                    evt.Payload.OrderItemId == firstItemId &&
+                    evt.Payload.ProcessType == "FDM"),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+        _publishEndpointMock.Verify(
+            p => p.Publish(
+                It.Is<JobCreatedEvent>(evt =>
+                    evt.Payload.OrderId == orderId &&
+                    evt.Payload.OrderItemId == secondItemId &&
+                    evt.Payload.ProcessType == "SLA"),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task CreateJobsForPaidOrderAsync_WithOrderNumber_UsesOrderNumberLookup()
     {
         var orderId = Guid.NewGuid();
