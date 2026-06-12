@@ -38,6 +38,14 @@ public class JobConfiguration : IEntityTypeConfiguration<Job>
             .HasColumnName("material_id")
             .IsRequired();
 
+        builder.Property(j => j.MaterialSnapshotJson)
+            .HasColumnName("material_snapshot_json")
+            .HasColumnType("jsonb");
+
+        builder.Property(j => j.ConfigurationSnapshotJson)
+            .HasColumnName("configuration_snapshot_json")
+            .HasColumnType("jsonb");
+
         builder.Property(j => j.CustomerId)
             .HasColumnName("customer_id")
             .HasMaxLength(80);

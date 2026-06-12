@@ -780,6 +780,39 @@ public class JobServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task CreateJobsForPaidOrderAsync_WhenOrderItemHasSnapshots_LocksSnapshotsOnJob()
+    {
+        var orderId = Guid.NewGuid();
+        const string materialSnapshotJson = "{\"materialId\":1,\"materialName\":\"PA12 Nylon\"}";
+        const string configurationSnapshotJson = "{\"orderedQuantity\":2,\"serviceCategoryId\":1}";
+        var orderItems = new List<OrderItemDto>
+        {
+            new()
+            {
+                OrderItemId = Guid.NewGuid(),
+                MaterialId = Guid.NewGuid(),
+                MaterialSnapshotJson = materialSnapshotJson,
+                ConfigurationSnapshotJson = configurationSnapshotJson,
+                Technology = "SLS",
+                VolumeCm3 = 12,
+                Quantity = 2,
+                EstimatedPrintTimeMinutes = 30,
+            },
+        };
+
+        _orderServiceClientMock
+            .Setup(c => c.GetOrderItemsAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(orderItems);
+
+        var result = await _service.CreateJobsForPaidOrderAsync(orderId);
+
+        Assert.Equal(1, result);
+        var job = await _dbContext.Jobs.SingleAsync(j => j.OrderId == orderId);
+        Assert.Equal(materialSnapshotJson, job.MaterialSnapshotJson);
+        Assert.Equal(configurationSnapshotJson, job.ConfigurationSnapshotJson);
+    }
+
+    [Fact]
     public async Task CreateJobsForPaidOrderAsync_CalculatesPriority()
     {
         var orderId = Guid.NewGuid();

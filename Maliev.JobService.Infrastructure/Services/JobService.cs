@@ -472,6 +472,8 @@ public class JobService : IJobService
                 SourceProjectId = item.SourceProjectId,
                 SourceProjectPartId = item.SourceProjectPartId,
                 MaterialId = item.MaterialId,
+                MaterialSnapshotJson = item.MaterialSnapshotJson,
+                ConfigurationSnapshotJson = item.ConfigurationSnapshotJson,
                 Technology = item.Technology,
                 VolumeCm3 = item.VolumeCm3,
                 EstimatedPrintTimeMinutes = estimatedPrintTime,

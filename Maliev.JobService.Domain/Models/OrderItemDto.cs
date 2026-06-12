@@ -13,6 +13,10 @@ public record OrderItemDto
     public Guid? SourceProjectPartId { get; init; }
     /// <summary>Gets the unique identifier of the material.</summary>
     public required Guid MaterialId { get; init; }
+    /// <summary>Gets the locked material snapshot JSON from the order boundary.</summary>
+    public string? MaterialSnapshotJson { get; init; }
+    /// <summary>Gets the locked configuration snapshot JSON from the order boundary.</summary>
+    public string? ConfigurationSnapshotJson { get; init; }
     /// <summary>Gets the manufacturing technology.</summary>
     public required string Technology { get; init; }
     /// <summary>Gets the part volume in cubic centimeters (per unit).</summary>

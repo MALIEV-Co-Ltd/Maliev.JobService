@@ -36,6 +36,16 @@ public class Job
     public Guid MaterialId { get; set; }
 
     /// <summary>
+    /// Gets or sets the locked material snapshot JSON captured when the job was created.
+    /// </summary>
+    public string? MaterialSnapshotJson { get; set; }
+
+    /// <summary>
+    /// Gets or sets the locked configuration snapshot JSON captured when the job was created.
+    /// </summary>
+    public string? ConfigurationSnapshotJson { get; set; }
+
+    /// <summary>
     /// Gets or sets the customer identifier associated with this job when known.
     /// </summary>
     public string? CustomerId { get; set; }
