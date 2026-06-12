@@ -11,6 +11,10 @@ public record OrderItemDto
     public Guid? SourceProjectId { get; init; }
     /// <summary>Gets the originating project part ID when the order item came from a project quotation.</summary>
     public Guid? SourceProjectPartId { get; init; }
+    /// <summary>Gets the customer identifier associated with the order.</summary>
+    public string? CustomerId { get; init; }
+    /// <summary>Gets the customer display name snapshot when known.</summary>
+    public string? CustomerName { get; init; }
     /// <summary>Gets the unique identifier of the material.</summary>
     public required Guid MaterialId { get; init; }
     /// <summary>Gets the locked material snapshot JSON from the order boundary.</summary>

@@ -7,6 +7,10 @@ public record OrderItemDto
 {
     /// <summary>Gets the unique identifier of the order item.</summary>
     public required Guid OrderItemId { get; init; }
+    /// <summary>Gets the customer identifier associated with the order.</summary>
+    public string? CustomerId { get; init; }
+    /// <summary>Gets the customer display name snapshot when known.</summary>
+    public string? CustomerName { get; init; }
     /// <summary>Gets the unique identifier of the material.</summary>
     public required Guid MaterialId { get; init; }
     /// <summary>Gets the manufacturing technology.</summary>

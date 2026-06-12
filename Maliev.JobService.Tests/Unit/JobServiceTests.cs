@@ -970,6 +970,37 @@ public class JobServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task CreateJobsForPaidOrderAsync_WhenOrderItemHasCustomerContext_CapturesCustomerContextOnJob()
+    {
+        var orderId = Guid.NewGuid();
+        var orderItems = new List<OrderItemDto>
+        {
+            new()
+            {
+                OrderItemId = Guid.NewGuid(),
+                MaterialId = Guid.NewGuid(),
+                CustomerId = "CUST-PROD-001",
+                CustomerName = "Production Buyer Ltd.",
+                Technology = "SLS",
+                VolumeCm3 = 12,
+                Quantity = 2,
+                EstimatedPrintTimeMinutes = 30,
+            },
+        };
+
+        _orderServiceClientMock
+            .Setup(c => c.GetOrderItemsAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(orderItems);
+
+        var result = await _service.CreateJobsForPaidOrderAsync(orderId);
+
+        Assert.Equal(1, result);
+        var job = await _dbContext.Jobs.SingleAsync(j => j.OrderId == orderId);
+        Assert.Equal("CUST-PROD-001", job.CustomerId);
+        Assert.Equal("Production Buyer Ltd.", job.CustomerName);
+    }
+
+    [Fact]
     public async Task CreateJobsForPaidOrderAsync_CalculatesPriority()
     {
         var orderId = Guid.NewGuid();

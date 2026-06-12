@@ -20,6 +20,8 @@ public sealed class OrderServiceClientTests
                   {
                     "orderItemId": "11111111-1111-1111-1111-111111111111",
                     "materialId": "22222222-2222-2222-2222-222222222222",
+                    "customerId": "CUST-PROD-001",
+                    "customerName": "Production Buyer Ltd.",
                     "materialSnapshotJson": "{{materialSnapshotJson.Replace("\"", "\\\"")}}",
                     "configurationSnapshotJson": "{{configurationSnapshotJson.Replace("\"", "\\\"")}}",
                     "technology": "SLS",
@@ -37,6 +39,8 @@ public sealed class OrderServiceClientTests
         var items = await client.GetOrderItemsAsync("ORD-2026-00123");
 
         var item = Assert.Single(items);
+        Assert.Equal("CUST-PROD-001", item.CustomerId);
+        Assert.Equal("Production Buyer Ltd.", item.CustomerName);
         Assert.Equal(materialSnapshotJson, item.MaterialSnapshotJson);
         Assert.Equal(configurationSnapshotJson, item.ConfigurationSnapshotJson);
         Assert.Equal("/order/v1/orders/ORD-2026-00123/items", handler.RequestUri!.AbsolutePath);

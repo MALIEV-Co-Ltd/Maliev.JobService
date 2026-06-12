@@ -509,6 +509,8 @@ public class JobService : IJobService
                 OrderItemId = item.OrderItemId,
                 SourceProjectId = item.SourceProjectId,
                 SourceProjectPartId = item.SourceProjectPartId,
+                CustomerId = NormalizeOptionalText(item.CustomerId),
+                CustomerName = NormalizeOptionalText(item.CustomerName),
                 MaterialId = item.MaterialId,
                 MaterialSnapshotJson = item.MaterialSnapshotJson,
                 ConfigurationSnapshotJson = item.ConfigurationSnapshotJson,
