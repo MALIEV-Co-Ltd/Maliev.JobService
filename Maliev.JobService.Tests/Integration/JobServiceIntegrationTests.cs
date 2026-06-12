@@ -18,7 +18,7 @@ namespace Maliev.JobService.Tests.Integration;
 
 public class JobServiceIntegrationTests : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = 
+    private readonly PostgreSqlContainer _postgres =
 #pragma warning disable CS0618
         new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
@@ -38,7 +38,7 @@ public class JobServiceIntegrationTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
-        
+
         var options = new DbContextOptionsBuilder<JobDbContext>()
             .UseNpgsql(_postgres.GetConnectionString())
             .Options;
@@ -49,7 +49,7 @@ public class JobServiceIntegrationTests : IAsyncLifetime
         _publishEndpointMock = new Mock<IPublishEndpoint>();
         _orderServiceClientMock = new Mock<IOrderServiceClient>();
         _loggerMock = new Mock<ILogger<Infrastructure.Services.JobService>>();
-        
+
         var meterFactory = new TestMeterFactory();
         _metrics = new JobMetrics(meterFactory);
 
@@ -128,6 +128,26 @@ public class JobServiceIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task QueueAsync_WithRealDb_PersistsStatusTransitionAudit()
+    {
+        var job = CreateTestJob(JobStatus.Pending);
+        _dbContext!.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        var before = DateTimeOffset.UtcNow;
+        var result = await _service!.QueueAsync(job.Id, "machine-1", "scanner-user");
+        var after = DateTimeOffset.UtcNow;
+
+        Assert.True(result.IsSuccess);
+        var audit = await _dbContext.JobStatusTransitionAudits.SingleAsync(audit => audit.JobId == job.Id);
+        Assert.Equal(JobStatus.Pending, audit.PreviousStatus);
+        Assert.Equal(JobStatus.Queued, audit.NewStatus);
+        Assert.Equal("scanner-user", audit.ChangedBy);
+        Assert.True(audit.ChangedAtUtc >= before);
+        Assert.True(audit.ChangedAtUtc <= after);
+    }
+
+    [Fact]
     public async Task RescheduleAsync_StartsWithinOneHourAfterExistingJob_ReturnsFailure()
     {
         var existing = CreateTestJob(JobStatus.Queued);
@@ -183,7 +203,7 @@ public class JobServiceIntegrationTests : IAsyncLifetime
         var result = await _service!.CompleteAsync(job.Id, "testuser");
 
         Assert.True(result.IsSuccess);
-        
+
         var updatedJob = await _dbContext.Jobs.FirstAsync(j => j.Id == job.Id);
         Assert.NotNull(updatedJob.CompletedAt);
         Assert.Equal(JobStatus.Completed, updatedJob.Status);
@@ -194,13 +214,13 @@ public class JobServiceIntegrationTests : IAsyncLifetime
     {
         var job1 = CreateTestJob(JobStatus.Pending);
         job1.Technology = "FDM";
-        
+
         var job2 = CreateTestJob(JobStatus.Pending);
         job2.Technology = "SLA";
-        
+
         var job3 = CreateTestJob(JobStatus.Queued);
         job3.Technology = "FDM";
-        
+
         _dbContext!.Jobs.AddRange(job1, job2, job3);
         await _dbContext.SaveChangesAsync();
 
@@ -216,10 +236,10 @@ public class JobServiceIntegrationTests : IAsyncLifetime
     {
         var activeJob = CreateTestJob(JobStatus.InProgress);
         activeJob.UpdatedAt = DateTime.UtcNow;
-        
+
         var oldCompletedJob = CreateTestJob(JobStatus.Completed);
         oldCompletedJob.UpdatedAt = DateTime.UtcNow.AddDays(-10);
-        
+
         _dbContext!.Jobs.AddRange(activeJob, oldCompletedJob);
         await _dbContext.SaveChangesAsync();
 
@@ -240,7 +260,7 @@ public class JobServiceIntegrationTests : IAsyncLifetime
         var result = await _service!.CancelAsync(job.Id, "Material unavailable", "testuser");
 
         Assert.True(result.IsSuccess);
-        
+
         var updatedJob = await _dbContext.Jobs.FirstAsync(j => j.Id == job.Id);
         Assert.Equal(JobStatus.Cancelled, updatedJob.Status);
         Assert.Equal("Material unavailable", updatedJob.Notes);
@@ -257,7 +277,7 @@ public class JobServiceIntegrationTests : IAsyncLifetime
         var result = await _service!.ReassignAsync(job.Id, "machine-2");
 
         Assert.True(result.IsSuccess);
-        
+
         var updatedJob = await _dbContext.Jobs.FirstAsync(j => j.Id == job.Id);
         Assert.Equal("machine-2", updatedJob.AssignedMachineId);
     }
@@ -286,7 +306,7 @@ public class JobServiceIntegrationTests : IAsyncLifetime
         var result = await _service!.CreateJobsForPaidOrderAsync(orderId);
 
         Assert.Equal(1, result);
-        
+
         var createdJob = await _dbContext!.Jobs.FirstAsync(j => j.OrderId == orderId);
         Assert.Equal(10, createdJob.Priority);
         Assert.Equal(JobStatus.Pending, createdJob.Status);
@@ -297,10 +317,10 @@ public class JobServiceIntegrationTests : IAsyncLifetime
     {
         var oldJob = CreateTestJob();
         oldJob.CreatedAt = DateTime.UtcNow.AddDays(-2);
-        
+
         var newJob = CreateTestJob();
         newJob.CreatedAt = DateTime.UtcNow;
-        
+
         _dbContext!.Jobs.AddRange(oldJob, newJob);
         await _dbContext.SaveChangesAsync();
 

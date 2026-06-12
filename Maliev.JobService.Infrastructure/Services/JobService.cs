@@ -219,6 +219,7 @@ public class JobService : IJobService
         job.Status = JobStatus.Queued;
         job.AssignedMachineId = machineId;
         job.UpdatedAt = DateTime.UtcNow;
+        AddStatusTransitionAudit(job, previousStatus, changedBy);
 
         await _schedulingService.ComputeSlotAsync(job, machineId, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -251,6 +252,7 @@ public class JobService : IJobService
         job.Status = JobStatus.InProgress;
         job.StartedAt = DateTime.UtcNow;
         job.UpdatedAt = DateTime.UtcNow;
+        AddStatusTransitionAudit(job, previousStatus, changedBy);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await _publishEndpoint.Publish(new JobStartedEvent(
@@ -303,6 +305,7 @@ public class JobService : IJobService
 
         job.Status = JobStatus.Finishing;
         job.UpdatedAt = DateTime.UtcNow;
+        AddStatusTransitionAudit(job, previousStatus, changedBy);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
@@ -335,6 +338,7 @@ public class JobService : IJobService
         job.Status = JobStatus.Completed;
         job.CompletedAt = DateTime.UtcNow;
         job.UpdatedAt = DateTime.UtcNow;
+        AddStatusTransitionAudit(job, previousStatus, changedBy);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
@@ -368,6 +372,7 @@ public class JobService : IJobService
         job.Status = JobStatus.Cancelled;
         job.Notes = reason;
         job.UpdatedAt = DateTime.UtcNow;
+        AddStatusTransitionAudit(job, previousStatus, changedBy, reason);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
@@ -1387,5 +1392,23 @@ public class JobService : IJobService
                 JobNumber: $"JOB-{job.Id:N}",
                 CreatedAt: new DateTimeOffset(DateTime.SpecifyKind(job.CreatedAt, DateTimeKind.Utc)))),
             cancellationToken);
+    }
+
+    private void AddStatusTransitionAudit(
+        Job job,
+        JobStatus previousStatus,
+        string changedBy,
+        string? notes = null)
+    {
+        _dbContext.JobStatusTransitionAudits.Add(new JobStatusTransitionAudit
+        {
+            Id = Guid.NewGuid(),
+            JobId = job.Id,
+            PreviousStatus = previousStatus,
+            NewStatus = job.Status,
+            ChangedBy = changedBy,
+            ChangedAtUtc = DateTimeOffset.UtcNow,
+            Notes = notes,
+        });
     }
 }

@@ -23,6 +23,11 @@ public class JobDbContext : DbContext
     public DbSet<Job> Jobs => Set<Job>();
 
     /// <summary>
+    /// Gets or sets the database set for job status transition audit records.
+    /// </summary>
+    public DbSet<JobStatusTransitionAudit> JobStatusTransitionAudits => Set<JobStatusTransitionAudit>();
+
+    /// <summary>
     /// Gets or sets the database set for tentative production planning holds.
     /// </summary>
     public DbSet<ProductionPlanningHold> ProductionPlanningHolds => Set<ProductionPlanningHold>();
@@ -31,6 +36,7 @@ public class JobDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfiguration(new JobConfiguration());
+        modelBuilder.ApplyConfiguration(new JobStatusTransitionAuditConfiguration());
         modelBuilder.ApplyConfiguration(new ProductionPlanningHoldConfiguration());
     }
 }
