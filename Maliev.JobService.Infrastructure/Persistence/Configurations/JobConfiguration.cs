@@ -24,6 +24,10 @@ public class JobConfiguration : IEntityTypeConfiguration<Job>
             .HasColumnName("order_id")
             .IsRequired();
 
+        builder.Property(j => j.OrderNumber)
+            .HasColumnName("order_number")
+            .HasMaxLength(64);
+
         builder.Property(j => j.OrderItemId)
             .HasColumnName("order_item_id")
             .IsRequired();

@@ -16,6 +16,11 @@ public class Job
     public Guid OrderId { get; set; }
 
     /// <summary>
+    /// Gets or sets the human-readable order number this job belongs to.
+    /// </summary>
+    public string? OrderNumber { get; set; }
+
+    /// <summary>
     /// Gets or sets the specific order item ID this job is producing.
     /// </summary>
     public Guid OrderItemId { get; set; }

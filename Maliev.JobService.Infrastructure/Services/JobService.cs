@@ -235,7 +235,7 @@ public class JobService : IJobService
         AddStatusTransitionAudit(job, previousStatus, changedBy);
 
         await _schedulingService.ComputeSlotAsync(job, machineId, cancellationToken);
-        await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
+        await PublishJobStatusChangedAsync(job, previousStatus, changedBy, orderProductionCompleted: false, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         _metrics.RecordTransition(previousStatus.ToString(), job.Status.ToString(), DateTime.UtcNow - transitionStart);
@@ -289,7 +289,7 @@ public class JobService : IJobService
                 StartedAt = job.StartedAt.Value,
             }), cancellationToken);
 
-        await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
+        await PublishJobStatusChangedAsync(job, previousStatus, changedBy, orderProductionCompleted: false, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         _metrics.RecordTransition(previousStatus.ToString(), job.Status.ToString(), DateTime.UtcNow - transitionStart);
@@ -320,7 +320,7 @@ public class JobService : IJobService
         job.UpdatedAt = DateTime.UtcNow;
         AddStatusTransitionAudit(job, previousStatus, changedBy);
 
-        await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
+        await PublishJobStatusChangedAsync(job, previousStatus, changedBy, orderProductionCompleted: false, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         _metrics.RecordTransition(previousStatus.ToString(), job.Status.ToString(), DateTime.UtcNow - transitionStart);
@@ -353,7 +353,15 @@ public class JobService : IJobService
         job.UpdatedAt = DateTime.UtcNow;
         AddStatusTransitionAudit(job, previousStatus, changedBy);
 
-        await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
+        bool isOrderProductionComplete = !await _dbContext.Jobs
+            .AnyAsync(
+                orderJob => orderJob.OrderId == job.OrderId
+                    && orderJob.Id != job.Id
+                    && orderJob.Status != JobStatus.Completed
+                    && orderJob.Status != JobStatus.Cancelled,
+                cancellationToken);
+
+        await PublishJobStatusChangedAsync(job, previousStatus, changedBy, isOrderProductionComplete, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         if (!string.IsNullOrEmpty(completedMachineId))
@@ -387,7 +395,7 @@ public class JobService : IJobService
         job.UpdatedAt = DateTime.UtcNow;
         AddStatusTransitionAudit(job, previousStatus, changedBy, reason);
 
-        await PublishJobStatusChangedAsync(job, previousStatus, changedBy, cancellationToken);
+        await PublishJobStatusChangedAsync(job, previousStatus, changedBy, orderProductionCompleted: false, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         if (!string.IsNullOrEmpty(cancelledMachineId))
@@ -493,6 +501,7 @@ public class JobService : IJobService
             {
                 Id = Guid.NewGuid(),
                 OrderId = orderId,
+                OrderNumber = lookupOrderId,
                 OrderItemId = item.OrderItemId,
                 SourceProjectId = item.SourceProjectId,
                 SourceProjectPartId = item.SourceProjectPartId,
@@ -1354,9 +1363,10 @@ public class JobService : IJobService
         Job job,
         JobStatus previousStatus,
         string changedBy,
+        bool orderProductionCompleted,
         CancellationToken cancellationToken)
     {
-        var consumedBy = job.Status == JobStatus.Completed
+        var consumedBy = job.Status == JobStatus.Completed && orderProductionCompleted
             ? CompletionStatusChangedConsumers
             : Array.Empty<string>();
 
@@ -1375,6 +1385,7 @@ public class JobService : IJobService
             {
                 JobId = job.Id,
                 OrderId = job.OrderId,
+                OrderNumber = job.OrderNumber,
                 PreviousStatus = previousStatus.ToString(),
                 NewStatus = job.Status.ToString(),
                 Technology = job.Technology,

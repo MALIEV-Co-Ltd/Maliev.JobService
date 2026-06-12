@@ -88,6 +88,7 @@ public class JobServiceTests : IAsyncLifetime
         {
             Id = id ?? Guid.NewGuid(),
             OrderId = Guid.NewGuid(),
+            OrderNumber = "ORD-2026-TEST",
             OrderItemId = Guid.NewGuid(),
             MaterialId = Guid.NewGuid(),
             Technology = "FDM",
@@ -575,10 +576,36 @@ public class JobServiceTests : IAsyncLifetime
                     evt.Payload.JobId == job.Id &&
                     evt.Payload.PreviousStatus == JobStatus.Finishing.ToString() &&
                     evt.Payload.NewStatus == JobStatus.Completed.ToString() &&
+                    evt.Payload.OrderNumber == job.OrderNumber &&
                     evt.Payload.ChangedBy == "scanner-operator" &&
                     evt.ConsumedBy.Contains("OrderService") &&
                     evt.ConsumedBy.Contains("QualityService") &&
                     evt.ConsumedBy.Contains("NotificationService")),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_WhenSiblingJobStillOpen_DoesNotRouteOrderCompletion()
+    {
+        var orderId = Guid.NewGuid();
+        var completedJob = CreateTestJob(JobStatus.Finishing);
+        completedJob.OrderId = orderId;
+        completedJob.OrderNumber = "ORD-2026-00456";
+        var openSiblingJob = CreateTestJob(JobStatus.InProgress);
+        openSiblingJob.OrderId = orderId;
+        openSiblingJob.OrderNumber = completedJob.OrderNumber;
+        _dbContext.Jobs.AddRange(completedJob, openSiblingJob);
+        await _dbContext.SaveChangesAsync();
+
+        await _service.CompleteAsync(completedJob.Id, "scanner-operator");
+
+        _publishEndpointMock.Verify(
+            p => p.Publish(
+                It.Is<JobStatusChangedEvent>(evt =>
+                    evt.Payload.JobId == completedJob.Id &&
+                    evt.Payload.NewStatus == JobStatus.Completed.ToString() &&
+                    !evt.ConsumedBy.Contains("OrderService")),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -879,6 +906,9 @@ public class JobServiceTests : IAsyncLifetime
         _orderServiceClientMock.Verify(
             c => c.GetOrderItemsAsync(orderNumber, It.IsAny<CancellationToken>()),
             Times.Once);
+
+        var job = await _dbContext.Jobs.SingleAsync(j => j.OrderId == orderId);
+        Assert.Equal(orderNumber, job.OrderNumber);
     }
 
     [Fact]
