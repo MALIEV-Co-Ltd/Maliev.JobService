@@ -794,6 +794,71 @@ public class JobServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task CreateJobsForPaidOrderAsync_WhenDuplicateOrderItemInsertedConcurrently_ReturnsZero()
+    {
+        var orderId = Guid.NewGuid();
+        var orderItemId = Guid.NewGuid();
+        var materialId = Guid.NewGuid();
+        var orderItems = new List<OrderItemDto>
+        {
+            new()
+            {
+                OrderItemId = orderItemId,
+                MaterialId = materialId,
+                MaterialSnapshotJson = LockedMaterialSnapshot(),
+                ConfigurationSnapshotJson = LockedConfigurationSnapshot(),
+                Technology = "FDM",
+                VolumeCm3 = 100,
+                EstimatedPrintTimeMinutes = 120,
+            },
+        };
+
+        _orderServiceClientMock
+            .Setup(c => c.GetOrderItemsAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(orderItems);
+
+        _publishEndpointMock
+            .Setup(p => p.Publish(It.IsAny<JobCreatedEvent>(), It.IsAny<CancellationToken>()))
+            .Callback<JobCreatedEvent, CancellationToken>((_, _) =>
+            {
+                var options = new DbContextOptionsBuilder<JobDbContext>()
+                    .UseNpgsql(_postgres.GetConnectionString())
+                    .Options;
+
+                using var duplicateContext = new JobDbContext(options);
+                duplicateContext.Jobs.Add(new Job
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = orderId,
+                    OrderNumber = orderId.ToString(),
+                    OrderItemId = orderItemId,
+                    MaterialId = materialId,
+                    MaterialSnapshotJson = LockedMaterialSnapshot(),
+                    ConfigurationSnapshotJson = LockedConfigurationSnapshot(),
+                    Technology = "FDM",
+                    VolumeCm3 = 100,
+                    EstimatedPrintTimeMinutes = 120,
+                    Priority = 5,
+                    Status = JobStatus.Pending,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                });
+                duplicateContext.SaveChanges();
+            })
+            .Returns(Task.CompletedTask);
+
+        var result = await _service.CreateJobsForPaidOrderAsync(orderId);
+
+        Assert.Equal(0, result);
+        var jobs = await _dbContext.Jobs
+            .AsNoTracking()
+            .Where(job => job.OrderId == orderId && job.OrderItemId == orderItemId)
+            .ToListAsync();
+        var job = Assert.Single(jobs);
+        Assert.Equal(materialId, job.MaterialId);
+    }
+
+    [Fact]
     public async Task CreateJobsForPaidOrderAsync_WhenNoOrderItems_ReturnsZero()
     {
         _orderServiceClientMock

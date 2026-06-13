@@ -543,7 +543,24 @@ public class JobService : IJobService
             await PublishJobCreatedAsync(job, cancellationToken);
         }
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsUniqueOrderItemJobConflict(ex))
+        {
+            _dbContext.ChangeTracker.Clear();
+
+            if (await MissingOrderItemsNowExistAsync(orderId, missingOrderItems, cancellationToken))
+            {
+                _logger.LogInformation(
+                    "Concurrent duplicate job creation detected for OrderId: {OrderId}; treating OrderPaidEvent as idempotent",
+                    orderId);
+                return 0;
+            }
+
+            throw;
+        }
 
         _metrics.RecordJobCreated(missingOrderItems.Count);
 
@@ -1149,6 +1166,40 @@ public class JobService : IJobService
                 cancellationToken);
 
         return activeJobCount + activeHoldCount + 1;
+    }
+
+    private async Task<bool> MissingOrderItemsNowExistAsync(
+        Guid orderId,
+        IReadOnlyCollection<OrderItemDto> missingOrderItems,
+        CancellationToken cancellationToken)
+    {
+        var missingOrderItemIds = missingOrderItems
+            .Select(item => item.OrderItemId)
+            .ToArray();
+
+        var existingCount = await _dbContext.Jobs
+            .AsNoTracking()
+            .Where(job => job.OrderId == orderId && missingOrderItemIds.Contains(job.OrderItemId))
+            .CountAsync(cancellationToken);
+
+        return existingCount == missingOrderItemIds.Length;
+    }
+
+    private static bool IsUniqueOrderItemJobConflict(DbUpdateException exception)
+    {
+        const string uniqueViolation = "23505";
+        const string orderItemConstraint = "ux_jobs_order_id_order_item_id";
+
+        var innerException = exception.InnerException;
+        return string.Equals(GetExceptionProperty(innerException, "SqlState"), uniqueViolation, StringComparison.Ordinal)
+            && string.Equals(GetExceptionProperty(innerException, "ConstraintName"), orderItemConstraint, StringComparison.Ordinal);
+    }
+
+    private static string? GetExceptionProperty(Exception? exception, string propertyName)
+    {
+        return exception?.GetType()
+            .GetProperty(propertyName)?
+            .GetValue(exception) as string;
     }
 
     private async Task<bool> HasScheduleOverlapAsync(
