@@ -314,6 +314,8 @@ public class JobServiceIntegrationTests : IAsyncLifetime
             {
                 OrderItemId = Guid.NewGuid(),
                 MaterialId = Guid.NewGuid(),
+                MaterialSnapshotJson = "{\"materialId\":\"locked-material\",\"materialName\":\"PA12 Nylon\"}",
+                ConfigurationSnapshotJson = "{\"orderedQuantity\":1,\"serviceCategoryId\":\"sls\"}",
                 Technology = "FDM",
                 VolumeCm3 = 100,
                 EstimatedPrintTimeMinutes = 120,

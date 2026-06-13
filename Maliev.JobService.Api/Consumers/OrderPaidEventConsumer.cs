@@ -46,6 +46,13 @@ public class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
 
         var orderId = payload.OrderId;
         var orderNumber = payload.OrderNumber;
+        if (string.IsNullOrWhiteSpace(orderNumber))
+        {
+            _logger.LogWarning(
+                "OrderPaidEvent for OrderId: {OrderId} is missing orderNumber; cannot create production jobs",
+                orderId);
+            throw new InvalidOperationException($"OrderPaidEvent for order {orderId} is missing orderNumber.");
+        }
 
         _logger.LogInformation("Processing OrderPaidEvent for OrderId: {OrderId}, OrderNumber: {OrderNumber}", orderId, orderNumber);
 

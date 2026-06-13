@@ -110,6 +110,27 @@ public sealed class OrderPaidEventConsumerTests
             () => consumer.Consume(contextMock.Object));
     }
 
+    [Fact]
+    public async Task Consume_OrderPaidEvent_WithoutOrderNumber_ThrowsBeforeOrderLookup()
+    {
+        var orderId = Guid.NewGuid();
+        var consumer = new OrderPaidEventConsumer(_jobServiceMock.Object, _loggerMock.Object);
+        var contextMock = new Mock<ConsumeContext<OrderPaidEvent>>();
+        contextMock.Setup(c => c.Message).Returns(BuildEvent(orderId, "   "));
+        contextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => consumer.Consume(contextMock.Object));
+
+        Assert.Contains("missing orderNumber", exception.Message, StringComparison.Ordinal);
+        _jobServiceMock.Verify(
+            s => s.CreateJobsForPaidOrderAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     /// <summary>
     /// When jobs already exist for the order (idempotency guard in the service),
     /// the consumer still completes without error — zero is a valid return value.

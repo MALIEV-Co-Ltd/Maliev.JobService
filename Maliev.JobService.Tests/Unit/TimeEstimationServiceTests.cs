@@ -10,17 +10,17 @@ public class TimeEstimationServiceTests
     // ── EstimatePrintTimeMinutes ──────────────────────────────────────────────
 
     [Theory]
-    [InlineData("FDM",      10, 120)]   // 10 cm³ × 12 min/cm³ = 120
-    [InlineData("SLA",      10, 80)]    // 10 cm³ × 8  min/cm³ = 80
-    [InlineData("SLS",      10, 60)]    // 10 cm³ × 6  min/cm³ = 60
-    [InlineData("MJF",      10, 50)]    // 10 cm³ × 5  min/cm³ = 50
-    [InlineData("CNC",      10, 150)]   // 10 cm³ × 15 min/cm³ = 150
+    [InlineData("FDM", 10, 120)]   // 10 cm³ × 12 min/cm³ = 120
+    [InlineData("SLA", 10, 80)]    // 10 cm³ × 8  min/cm³ = 80
+    [InlineData("SLS", 10, 60)]    // 10 cm³ × 6  min/cm³ = 60
+    [InlineData("MJF", 10, 50)]    // 10 cm³ × 5  min/cm³ = 50
+    [InlineData("CNC", 10, 150)]   // 10 cm³ × 15 min/cm³ = 150
     [InlineData("CNC_MILL", 10, 150)]
     [InlineData("CNC_TURN", 10, 120)]   // 10 cm³ × 12 min/cm³ = 120
-    [InlineData("SLA_DLP",  10, 80)]
-    [InlineData("MSLA",     10, 80)]
-    [InlineData("DLP",      10, 80)]
-    [InlineData("FFF",      10, 120)]
+    [InlineData("SLA_DLP", 10, 80)]
+    [InlineData("MSLA", 10, 80)]
+    [InlineData("DLP", 10, 80)]
+    [InlineData("FFF", 10, 120)]
     public void EstimatePrintTimeMinutes_KnownTechnology_ReturnsCorrectValue(
         string technology, decimal volumeCm3, int expected)
     {
@@ -78,15 +78,15 @@ public class TimeEstimationServiceTests
     // ── EstimateSetupTimeMinutes ──────────────────────────────────────────────
 
     [Theory]
-    [InlineData("FDM",      15)]
-    [InlineData("FFF",      15)]
-    [InlineData("SLA",      30)]
-    [InlineData("SLA_DLP",  30)]
-    [InlineData("MSLA",     30)]
-    [InlineData("DLP",      30)]
-    [InlineData("SLS",      20)]
-    [InlineData("MJF",      20)]
-    [InlineData("CNC",      60)]
+    [InlineData("FDM", 15)]
+    [InlineData("FFF", 15)]
+    [InlineData("SLA", 30)]
+    [InlineData("SLA_DLP", 30)]
+    [InlineData("MSLA", 30)]
+    [InlineData("DLP", 30)]
+    [InlineData("SLS", 20)]
+    [InlineData("MJF", 20)]
+    [InlineData("CNC", 60)]
     [InlineData("CNC_MILL", 60)]
     [InlineData("CNC_TURN", 45)]
     public void EstimateSetupTimeMinutes_KnownTechnology_ReturnsCorrectValue(
