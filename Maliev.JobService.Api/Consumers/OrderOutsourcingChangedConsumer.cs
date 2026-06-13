@@ -28,8 +28,15 @@ public class OrderOutsourcingChangedConsumer : IConsumer<OrderOutsourcingChanged
     /// <inheritdoc />
     public async Task Consume(ConsumeContext<OrderOutsourcingChangedEvent> context)
     {
-        var orderId = context.Message.Payload.OrderId;
-        var isOutsourced = context.Message.Payload.IsOutsourced;
+        var payload = context.Message.Payload;
+        if (payload is null)
+        {
+            _logger.LogWarning("OrderOutsourcingChangedEvent received without payload; skipping");
+            return;
+        }
+
+        var orderId = payload.OrderId;
+        var isOutsourced = payload.IsOutsourced;
 
         _logger.LogInformation(
             "Processing OrderOutsourcingChangedEvent for OrderId: {OrderId}, IsOutsourced: {IsOutsourced}",
