@@ -157,4 +157,46 @@ public sealed class OrderPaidEventConsumerTests
                 It.IsAny<CancellationToken>()),
             Times.Never);
     }
+
+    [Fact]
+    public async Task Consume_OrderPaidEvent_WithoutPayload_IgnoresEvent()
+    {
+        var consumer = new OrderPaidEventConsumer(_jobServiceMock.Object, _loggerMock.Object);
+        var contextMock = new Mock<ConsumeContext<OrderPaidEvent>>();
+        contextMock.Setup(c => c.Message).Returns(BuildEvent(Guid.NewGuid()) with
+        {
+            Payload = null!
+        });
+        contextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
+
+        await consumer.Consume(contextMock.Object);
+
+        _jobServiceMock.Verify(
+            s => s.CreateJobsForPaidOrderAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Consume_OrderPaidEvent_WithoutRoutingList_IgnoresEvent()
+    {
+        var consumer = new OrderPaidEventConsumer(_jobServiceMock.Object, _loggerMock.Object);
+        var contextMock = new Mock<ConsumeContext<OrderPaidEvent>>();
+        contextMock.Setup(c => c.Message).Returns(BuildEvent(Guid.NewGuid()) with
+        {
+            ConsumedBy = null!
+        });
+        contextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
+
+        await consumer.Consume(contextMock.Object);
+
+        _jobServiceMock.Verify(
+            s => s.CreateJobsForPaidOrderAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
 }
