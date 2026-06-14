@@ -218,6 +218,12 @@ public class JobService : IJobService
         string changedBy,
         CancellationToken cancellationToken = default)
     {
+        machineId = machineId?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(machineId))
+        {
+            return JobOperationResult.Failure("MachineId is required to queue a job.");
+        }
+
         var job = await _dbContext.Jobs.FindAsync([id], cancellationToken);
         if (job is null)
         {
@@ -384,6 +390,12 @@ public class JobService : IJobService
         string changedBy,
         CancellationToken cancellationToken = default)
     {
+        reason = reason?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return JobOperationResult.Failure("Cancellation reason is required.");
+        }
+
         var job = await _dbContext.Jobs.FindAsync([id], cancellationToken);
         if (job is null)
         {
@@ -414,6 +426,12 @@ public class JobService : IJobService
     /// <inheritdoc />
     public async Task<JobOperationResult> ReassignAsync(Guid id, string machineId, CancellationToken cancellationToken = default)
     {
+        machineId = machineId?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(machineId))
+        {
+            return JobOperationResult.Failure("MachineId is required to reassign a job.");
+        }
+
         var job = await _dbContext.Jobs.FindAsync([id], cancellationToken);
         if (job is null)
         {

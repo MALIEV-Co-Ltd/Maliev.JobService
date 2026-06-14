@@ -128,6 +128,24 @@ public class JobServiceIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task QueueAsync_WithBlankMachineId_ReturnsFailureWithoutAudit()
+    {
+        var job = CreateTestJob(JobStatus.Pending);
+        _dbContext!.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service!.QueueAsync(job.Id, "   ", "testuser");
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("Machine", result.Error, StringComparison.OrdinalIgnoreCase);
+
+        var updatedJob = await _dbContext.Jobs.FirstAsync(j => j.Id == job.Id);
+        Assert.Equal(JobStatus.Pending, updatedJob.Status);
+        Assert.Null(updatedJob.AssignedMachineId);
+        Assert.False(await _dbContext.JobStatusTransitionAudits.AnyAsync(audit => audit.JobId == job.Id));
+    }
+
+    [Fact]
     public async Task QueueAsync_WithRealDb_PersistsStatusTransitionAudit()
     {
         var job = CreateTestJob(JobStatus.Pending);
@@ -289,6 +307,25 @@ public class JobServiceIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task CancelAsync_WithBlankReason_ReturnsFailureWithoutAudit()
+    {
+        var job = CreateTestJob(JobStatus.InProgress);
+        job.Notes = "Original note";
+        _dbContext!.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service!.CancelAsync(job.Id, "   ", "testuser");
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("reason", result.Error, StringComparison.OrdinalIgnoreCase);
+
+        var updatedJob = await _dbContext.Jobs.FirstAsync(j => j.Id == job.Id);
+        Assert.Equal(JobStatus.InProgress, updatedJob.Status);
+        Assert.Equal("Original note", updatedJob.Notes);
+        Assert.False(await _dbContext.JobStatusTransitionAudits.AnyAsync(audit => audit.JobId == job.Id));
+    }
+
+    [Fact]
     public async Task ReassignAsync_WithRealDb_UpdatesMachineId()
     {
         var job = CreateTestJob(JobStatus.Queued);
@@ -302,6 +339,23 @@ public class JobServiceIntegrationTests : IAsyncLifetime
 
         var updatedJob = await _dbContext.Jobs.FirstAsync(j => j.Id == job.Id);
         Assert.Equal("machine-2", updatedJob.AssignedMachineId);
+    }
+
+    [Fact]
+    public async Task ReassignAsync_WithBlankMachineId_ReturnsFailure()
+    {
+        var job = CreateTestJob(JobStatus.Queued);
+        job.AssignedMachineId = "machine-1";
+        _dbContext!.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service!.ReassignAsync(job.Id, "   ");
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("Machine", result.Error, StringComparison.OrdinalIgnoreCase);
+
+        var updatedJob = await _dbContext.Jobs.FirstAsync(j => j.Id == job.Id);
+        Assert.Equal("machine-1", updatedJob.AssignedMachineId);
     }
 
     [Fact]
