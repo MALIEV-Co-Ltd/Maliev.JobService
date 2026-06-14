@@ -263,6 +263,11 @@ public class JobService : IJobService
             return JobOperationResult.NotFound();
         }
 
+        if (job.Status == JobStatus.InProgress)
+        {
+            return JobOperationResult.Success(job);
+        }
+
         var (valid, error) = ValidateTransition(job.Status, "start");
         if (!valid)
         {
@@ -317,6 +322,11 @@ public class JobService : IJobService
             return JobOperationResult.NotFound();
         }
 
+        if (job.Status == JobStatus.Finishing)
+        {
+            return JobOperationResult.Success(job);
+        }
+
         var (valid, error) = ValidateTransition(job.Status, "finish");
         if (!valid)
         {
@@ -346,6 +356,11 @@ public class JobService : IJobService
         if (job is null)
         {
             return JobOperationResult.NotFound();
+        }
+
+        if (job.Status == JobStatus.Completed)
+        {
+            return JobOperationResult.Success(job);
         }
 
         var (valid, error) = ValidateTransition(job.Status, "complete");

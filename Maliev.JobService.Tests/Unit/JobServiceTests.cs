@@ -473,6 +473,32 @@ public class JobServiceTests : IAsyncLifetime
             Times.Once);
     }
 
+    [Fact]
+    public async Task StartAsync_WhenAlreadyInProgress_ReturnsSuccessWithoutDuplicateEventsOrAudit()
+    {
+        var startedAt = DateTime.UtcNow.AddMinutes(-15);
+        var updatedAt = DateTime.UtcNow.AddMinutes(-10);
+        var job = CreateTestJob(JobStatus.InProgress);
+        job.StartedAt = startedAt;
+        job.UpdatedAt = updatedAt;
+        _dbContext.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.StartAsync(job.Id, "scanner-retry");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(JobStatus.InProgress, result.Job!.Status);
+        Assert.Equal(startedAt, result.Job.StartedAt);
+        Assert.Equal(updatedAt, result.Job.UpdatedAt);
+        Assert.False(await _dbContext.JobStatusTransitionAudits.AnyAsync(audit => audit.JobId == job.Id));
+        _publishEndpointMock.Verify(
+            p => p.Publish(It.IsAny<JobStartedEvent>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _publishEndpointMock.Verify(
+            p => p.Publish(It.IsAny<JobStatusChangedEvent>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     [Theory]
     [InlineData("QueueAsync")]
     [InlineData("FinishAsync")]
@@ -546,6 +572,26 @@ public class JobServiceTests : IAsyncLifetime
         Assert.Equal(JobStatus.Finishing, result.Job!.Status);
     }
 
+    [Fact]
+    public async Task FinishAsync_WhenAlreadyFinishing_ReturnsSuccessWithoutDuplicateStatusEventOrAudit()
+    {
+        var updatedAt = DateTime.UtcNow.AddMinutes(-8);
+        var job = CreateTestJob(JobStatus.Finishing);
+        job.UpdatedAt = updatedAt;
+        _dbContext.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.FinishAsync(job.Id, "scanner-retry");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(JobStatus.Finishing, result.Job!.Status);
+        Assert.Equal(updatedAt, result.Job.UpdatedAt);
+        Assert.False(await _dbContext.JobStatusTransitionAudits.AnyAsync(audit => audit.JobId == job.Id));
+        _publishEndpointMock.Verify(
+            p => p.Publish(It.IsAny<JobStatusChangedEvent>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     #endregion
 
     #region CompleteAsync
@@ -582,6 +628,29 @@ public class JobServiceTests : IAsyncLifetime
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Job!.CompletedAt);
         Assert.Equal(JobStatus.Completed, result.Job.Status);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_WhenAlreadyCompleted_ReturnsSuccessWithoutDuplicateStatusEventOrAudit()
+    {
+        var completedAt = DateTime.UtcNow.AddMinutes(-4);
+        var updatedAt = DateTime.UtcNow.AddMinutes(-3);
+        var job = CreateTestJob(JobStatus.Completed);
+        job.CompletedAt = completedAt;
+        job.UpdatedAt = updatedAt;
+        _dbContext.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.CompleteAsync(job.Id, "scanner-retry");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(JobStatus.Completed, result.Job!.Status);
+        Assert.Equal(completedAt, result.Job.CompletedAt);
+        Assert.Equal(updatedAt, result.Job.UpdatedAt);
+        Assert.False(await _dbContext.JobStatusTransitionAudits.AnyAsync(audit => audit.JobId == job.Id));
+        _publishEndpointMock.Verify(
+            p => p.Publish(It.IsAny<JobStatusChangedEvent>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
