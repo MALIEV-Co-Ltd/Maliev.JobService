@@ -111,21 +111,28 @@ public sealed class OrderPaidEventConsumerTests
     }
 
     [Fact]
-    public async Task Consume_OrderPaidEvent_WithoutOrderNumber_ThrowsBeforeOrderLookup()
+    public async Task Consume_OrderPaidEvent_WithoutOrderNumber_FallsBackToOrderIdLookup()
     {
         var orderId = Guid.NewGuid();
+        _jobServiceMock
+            .Setup(s => s.CreateJobsForPaidOrderAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(2);
+
         var consumer = new OrderPaidEventConsumer(_jobServiceMock.Object, _loggerMock.Object);
         var contextMock = new Mock<ConsumeContext<OrderPaidEvent>>();
         contextMock.Setup(c => c.Message).Returns(BuildEvent(orderId, "   "));
         contextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => consumer.Consume(contextMock.Object));
+        await consumer.Consume(contextMock.Object);
 
-        Assert.Contains("missing orderNumber", exception.Message, StringComparison.Ordinal);
         _jobServiceMock.Verify(
             s => s.CreateJobsForPaidOrderAsync(
-                It.IsAny<Guid>(),
+                orderId,
+                CancellationToken.None),
+            Times.Once);
+        _jobServiceMock.Verify(
+            s => s.CreateJobsForPaidOrderAsync(
+                orderId,
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);

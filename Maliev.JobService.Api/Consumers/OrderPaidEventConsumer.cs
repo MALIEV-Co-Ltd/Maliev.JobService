@@ -49,9 +49,15 @@ public class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
         if (string.IsNullOrWhiteSpace(orderNumber))
         {
             _logger.LogWarning(
-                "OrderPaidEvent for OrderId: {OrderId} is missing orderNumber; cannot create production jobs",
+                "OrderPaidEvent for OrderId: {OrderId} is missing orderNumber; falling back to OrderId lookup",
                 orderId);
-            throw new InvalidOperationException($"OrderPaidEvent for order {orderId} is missing orderNumber.");
+
+            var fallbackCreatedCount = await _jobService.CreateJobsForPaidOrderAsync(orderId, context.CancellationToken);
+            _logger.LogInformation(
+                "OrderPaidEvent processing completed for OrderId: {OrderId} using fallback lookup (created jobs: {Count})",
+                orderId,
+                fallbackCreatedCount);
+            return;
         }
 
         _logger.LogInformation("Processing OrderPaidEvent for OrderId: {OrderId}, OrderNumber: {OrderNumber}", orderId, orderNumber);
