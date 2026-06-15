@@ -57,6 +57,10 @@ public class JobService : IJobService
     [
         "OrderService"
     ];
+    private static readonly string[] JobStartedConsumers =
+    [
+        "MaterialService"
+    ];
     private static readonly string[] JobCreatedConsumers =
     [
         "NotificationService",
@@ -288,7 +292,7 @@ public class JobService : IJobService
             MessageType: MessageType.Event,
             MessageVersion: "1.0.0",
             PublishedBy: "job-service",
-            ConsumedBy: Array.Empty<string>(),
+            ConsumedBy: JobStartedConsumers,
             CorrelationId: Guid.NewGuid(),
             CausationId: null,
             OccurredAtUtc: DateTimeOffset.UtcNow,

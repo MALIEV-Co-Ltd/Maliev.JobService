@@ -469,7 +469,13 @@ public class JobServiceTests : IAsyncLifetime
         await _service.StartAsync(job.Id, "user");
 
         _publishEndpointMock.Verify(
-            p => p.Publish(It.IsAny<JobStartedEvent>(), It.IsAny<CancellationToken>()),
+            p => p.Publish(
+                It.Is<JobStartedEvent>(evt =>
+                    evt.ConsumedBy.Contains("MaterialService") &&
+                    evt.Payload.JobId == job.Id &&
+                    evt.Payload.OrderId == job.OrderId &&
+                    evt.Payload.MaterialId == job.MaterialId),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
