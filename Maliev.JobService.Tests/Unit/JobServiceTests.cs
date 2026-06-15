@@ -471,7 +471,7 @@ public class JobServiceTests : IAsyncLifetime
         _publishEndpointMock.Verify(
             p => p.Publish(
                 It.Is<JobStartedEvent>(evt =>
-                    evt.ConsumedBy.Contains("MaterialService") &&
+                    evt.ConsumedBy.Contains("InventoryService") &&
                     evt.Payload.JobId == job.Id &&
                     evt.Payload.OrderId == job.OrderId &&
                     evt.Payload.MaterialId == job.MaterialId),

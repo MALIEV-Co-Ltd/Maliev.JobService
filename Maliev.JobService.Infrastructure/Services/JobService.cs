@@ -59,7 +59,7 @@ public class JobService : IJobService
     ];
     private static readonly string[] JobStartedConsumers =
     [
-        "MaterialService"
+        "InventoryService"
     ];
     private static readonly string[] JobCreatedConsumers =
     [
