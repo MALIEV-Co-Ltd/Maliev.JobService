@@ -63,8 +63,7 @@ public class JobService : IJobService
     ];
     private static readonly string[] JobCreatedConsumers =
     [
-        "NotificationService",
-        "MaterialService"
+        "NotificationService"
     ];
 
     /// <summary>

@@ -1029,6 +1029,7 @@ public class JobServiceTests : IAsyncLifetime
                 It.Is<JobCreatedEvent>(evt =>
                     evt.PublishedBy == "job-service" &&
                     evt.ConsumedBy.Contains("NotificationService") &&
+                    !evt.ConsumedBy.Contains("MaterialService") &&
                     evt.Payload.OrderId == orderId &&
                     evt.Payload.OrderItemId == firstItemId &&
                     evt.Payload.ProcessType == "FDM"),
