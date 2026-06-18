@@ -315,6 +315,50 @@ public class JobServiceTests : IAsyncLifetime
         Assert.Contains("MaterialId", result.Error, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task UpdateDetailsAsync_WhenOptionalTextFieldsAreOmitted_PreservesExistingContext()
+    {
+        var materialId = Guid.NewGuid();
+        var job = CreateTestJob(JobStatus.Queued);
+        job.CustomerId = "C-41901388";
+        job.CustomerName = "AsianRider";
+        job.AssignedOperator = "Natthapol Vanasrivilai";
+        _dbContext.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.UpdateDetailsAsync(job.Id, new UpdateJobDetailsCommand
+        {
+            MaterialId = materialId,
+            Priority = 2,
+        }, "planner");
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Job);
+        Assert.Equal("C-41901388", result.Job.CustomerId);
+        Assert.Equal("AsianRider", result.Job.CustomerName);
+        Assert.Equal("Natthapol Vanasrivilai", result.Job.AssignedOperator);
+        Assert.Equal(materialId, result.Job.MaterialId);
+        Assert.Equal(2, result.Job.Priority);
+    }
+
+    [Fact]
+    public async Task UpdateDetailsAsync_WhenOptionalTextFieldIsBlank_ClearsExistingValue()
+    {
+        var job = CreateTestJob(JobStatus.Queued);
+        job.AssignedOperator = "Natthapol Vanasrivilai";
+        _dbContext.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _service.UpdateDetailsAsync(job.Id, new UpdateJobDetailsCommand
+        {
+            AssignedOperator = "   ",
+        }, "planner");
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Job);
+        Assert.Null(result.Job.AssignedOperator);
+    }
+
     #endregion
 
     #region QueueAsync

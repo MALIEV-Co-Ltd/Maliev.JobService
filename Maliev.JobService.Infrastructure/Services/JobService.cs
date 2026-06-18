@@ -199,9 +199,21 @@ public class JobService : IJobService
             job.Priority = command.Priority.Value;
         }
 
-        job.CustomerId = NormalizeOptionalText(command.CustomerId);
-        job.CustomerName = NormalizeOptionalText(command.CustomerName);
-        job.AssignedOperator = NormalizeOptionalText(command.AssignedOperator);
+        if (command.CustomerId is not null)
+        {
+            job.CustomerId = NormalizeOptionalText(command.CustomerId);
+        }
+
+        if (command.CustomerName is not null)
+        {
+            job.CustomerName = NormalizeOptionalText(command.CustomerName);
+        }
+
+        if (command.AssignedOperator is not null)
+        {
+            job.AssignedOperator = NormalizeOptionalText(command.AssignedOperator);
+        }
+
         job.UpdatedAt = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
