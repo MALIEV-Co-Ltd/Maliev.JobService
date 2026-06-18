@@ -50,6 +50,7 @@ public class JobService : IJobService
     private static readonly string[] CompletionStatusChangedConsumers =
     [
         "OrderService",
+        "QualityService",
         "NotificationService"
     ];
     private static readonly string[] ProductionStartStatusChangedConsumers =
