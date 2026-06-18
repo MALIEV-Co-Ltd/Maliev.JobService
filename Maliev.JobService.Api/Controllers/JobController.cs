@@ -119,13 +119,19 @@ public class JobController : ControllerBase
     {
         var jobs = await _jobService.GetKanbanJobsAsync(cancellationToken);
 
+        List<KanbanJobDto> qualityReviewPending = jobs
+            .Where(j => j.Status == JobStatus.Completed)
+            .Select(KanbanJobDto.FromEntity)
+            .ToList();
+
         var response = new KanbanResponse
         {
             Pending = jobs.Where(j => j.Status == JobStatus.Pending).Select(KanbanJobDto.FromEntity).ToList(),
             Queued = jobs.Where(j => j.Status == JobStatus.Queued).Select(KanbanJobDto.FromEntity).ToList(),
             InProgress = jobs.Where(j => j.Status == JobStatus.InProgress).Select(KanbanJobDto.FromEntity).ToList(),
             Finishing = jobs.Where(j => j.Status == JobStatus.Finishing).Select(KanbanJobDto.FromEntity).ToList(),
-            Completed = jobs.Where(j => j.Status == JobStatus.Completed).Select(KanbanJobDto.FromEntity).ToList(),
+            QualityReviewPending = qualityReviewPending,
+            Completed = qualityReviewPending,
             Cancelled = jobs.Where(j => j.Status == JobStatus.Cancelled).Select(KanbanJobDto.FromEntity).ToList(),
         };
 

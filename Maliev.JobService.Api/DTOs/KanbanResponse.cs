@@ -13,7 +13,9 @@ public record KanbanResponse
     public List<KanbanJobDto> InProgress { get; init; } = [];
     /// <summary>Jobs in post-production finishing.</summary>
     public List<KanbanJobDto> Finishing { get; init; } = [];
-    /// <summary>Successfully completed jobs.</summary>
+    /// <summary>Jobs whose production work is complete and are waiting for quality review.</summary>
+    public List<KanbanJobDto> QualityReviewPending { get; init; } = [];
+    /// <summary>Legacy alias for jobs whose production work is complete and are waiting for quality review.</summary>
     public List<KanbanJobDto> Completed { get; init; } = [];
     /// <summary>Jobs that have been cancelled.</summary>
     public List<KanbanJobDto> Cancelled { get; init; } = [];
