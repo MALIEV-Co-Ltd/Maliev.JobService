@@ -19,6 +19,10 @@ public record JobDto
     public Guid? SourceProjectPartId { get; init; }
     /// <summary>Gets the unique identifier of the material to be used.</summary>
     public required Guid MaterialId { get; init; }
+    /// <summary>Gets the locked material snapshot JSON used by production.</summary>
+    public string? MaterialSnapshotJson { get; init; }
+    /// <summary>Gets the locked configuration snapshot JSON used by production.</summary>
+    public string? ConfigurationSnapshotJson { get; init; }
     /// <summary>Gets the customer identifier associated with this job when known.</summary>
     public string? CustomerId { get; init; }
     /// <summary>Gets the customer display name captured for production context.</summary>
@@ -71,6 +75,8 @@ public record JobDto
         SourceProjectId = job.SourceProjectId,
         SourceProjectPartId = job.SourceProjectPartId,
         MaterialId = job.MaterialId,
+        MaterialSnapshotJson = job.MaterialSnapshotJson,
+        ConfigurationSnapshotJson = job.ConfigurationSnapshotJson,
         CustomerId = job.CustomerId,
         CustomerName = job.CustomerName,
         Technology = job.Technology,
