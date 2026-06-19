@@ -29,6 +29,27 @@ public class JobControllerTests
         Assert.Equal(completedJob.Id, qualityReviewJob.JobId);
     }
 
+    [Fact]
+    public async Task GetJobsByOrder_ReturnsJobsForRequestedOrder()
+    {
+        var orderId = Guid.NewGuid();
+        var job = CreateTestJob(JobStatus.Pending);
+        job.OrderId = orderId;
+        var service = new Mock<IJobService>();
+        _ = service
+            .Setup(jobService => jobService.GetJobsByOrderAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([job]);
+        var controller = new JobController(service.Object, NullLogger<JobController>.Instance);
+
+        ActionResult<IReadOnlyList<JobDto>> result = await controller.GetJobsByOrder(orderId, CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var jobs = Assert.IsAssignableFrom<IReadOnlyList<JobDto>>(okResult.Value);
+        var returnedJob = Assert.Single(jobs);
+        Assert.Equal(job.Id, returnedJob.JobId);
+        Assert.Equal(orderId, returnedJob.OrderId);
+    }
+
     private static Job CreateTestJob(JobStatus status)
     {
         return new Job

@@ -109,6 +109,24 @@ public class JobController : ControllerBase
     }
 
     /// <summary>
+    /// Retrieves all jobs linked to a specific order.
+    /// </summary>
+    /// <param name="orderId">The order identifier.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The jobs linked to the order.</returns>
+    [HttpGet("by-order/{orderId}")]
+    [RequirePermission(JobPermissions.JobsRead)]
+    public async Task<ActionResult<IReadOnlyList<JobDto>>> GetJobsByOrder(Guid orderId, CancellationToken cancellationToken)
+    {
+        var jobs = await _jobService.GetJobsByOrderAsync(orderId, cancellationToken);
+        var items = jobs.Select(JobDto.FromEntity).ToList();
+
+        _logger.LogInformation("Retrieved {Count} jobs for order {OrderId}", items.Count, orderId);
+
+        return Ok(items);
+    }
+
+    /// <summary>
     /// Retrieves the jobs in a Kanban board format.
     /// </summary>
     /// <param name="cancellationToken">A token used to cancel the operation.</param>

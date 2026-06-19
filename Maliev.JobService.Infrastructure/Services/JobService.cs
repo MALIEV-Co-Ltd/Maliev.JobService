@@ -159,6 +159,17 @@ public class JobService : IJobService
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<Job>> GetJobsByOrderAsync(Guid orderId, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Jobs
+            .AsNoTracking()
+            .Where(job => job.OrderId == orderId)
+            .OrderByDescending(job => job.CreatedAt)
+            .ThenBy(job => job.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<Job>> GetKanbanJobsAsync(CancellationToken cancellationToken = default)
     {
         var recentThreshold = DateTime.UtcNow.AddDays(-JobServiceConstants.RecentDaysThreshold);

@@ -45,6 +45,14 @@ public interface IJobService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets all jobs linked to an order.
+    /// </summary>
+    /// <param name="orderId">The order identifier.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The jobs linked to the order.</returns>
+    Task<IReadOnlyList<Job>> GetJobsByOrderAsync(Guid orderId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets active and recently-updated jobs for Kanban display.
     /// </summary>
     /// <param name="cancellationToken">A token used to cancel the operation.</param>
