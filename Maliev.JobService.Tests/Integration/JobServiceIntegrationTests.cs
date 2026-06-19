@@ -31,6 +31,7 @@ public class JobServiceIntegrationTests : IAsyncLifetime
     private JobDbContext _dbContext = null!;
     private Mock<IPublishEndpoint> _publishEndpointMock = null!;
     private Mock<IOrderServiceClient> _orderServiceClientMock = null!;
+    private Mock<IProjectServiceClient> _projectServiceClientMock = null!;
     private Mock<ILogger<Infrastructure.Services.JobService>> _loggerMock = null!;
     private JobMetrics _metrics = null!;
     private Infrastructure.Services.JobService _service = null!;
@@ -48,6 +49,7 @@ public class JobServiceIntegrationTests : IAsyncLifetime
 
         _publishEndpointMock = new Mock<IPublishEndpoint>();
         _orderServiceClientMock = new Mock<IOrderServiceClient>();
+        _projectServiceClientMock = new Mock<IProjectServiceClient>();
         _loggerMock = new Mock<ILogger<Infrastructure.Services.JobService>>();
 
         var meterFactory = new TestMeterFactory();
@@ -63,7 +65,8 @@ public class JobServiceIntegrationTests : IAsyncLifetime
             scheduling,
             estimation,
             _metrics,
-            _loggerMock.Object);
+            _loggerMock.Object,
+            _projectServiceClientMock.Object);
     }
 
     public async Task DisposeAsync()

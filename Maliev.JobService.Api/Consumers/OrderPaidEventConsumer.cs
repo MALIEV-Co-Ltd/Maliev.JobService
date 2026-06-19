@@ -35,15 +35,6 @@ public class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
             return;
         }
 
-        if (!IsRoutedToJobService(context.Message))
-        {
-            _logger.LogDebug(
-                "Ignoring untargeted OrderPaidEvent for OrderId: {OrderId}, OrderNumber: {OrderNumber}",
-                payload.OrderId,
-                payload.OrderNumber);
-            return;
-        }
-
         var orderId = payload.OrderId;
         var orderNumber = payload.OrderNumber;
         if (string.IsNullOrWhiteSpace(orderNumber))
@@ -66,9 +57,4 @@ public class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
         _logger.LogInformation("OrderPaidEvent processing completed for OrderId: {OrderId}, OrderNumber: {OrderNumber} (created jobs: {Count})", orderId, orderNumber, createdCount);
     }
 
-    private static bool IsRoutedToJobService(OrderPaidEvent message)
-    {
-        return message.ConsumedBy?.Any(
-            consumer => consumer.Equals("JobService", StringComparison.OrdinalIgnoreCase)) == true;
-    }
 }

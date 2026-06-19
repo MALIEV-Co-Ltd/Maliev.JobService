@@ -43,6 +43,7 @@ public class JobService : IJobService
     private readonly JobDbContext _dbContext;
     private readonly IPublishEndpoint _publishEndpoint;
     private readonly IOrderServiceClient _orderServiceClient;
+    private readonly IProjectServiceClient _projectServiceClient;
     private readonly ISchedulingService _schedulingService;
     private readonly ITimeEstimationService _timeEstimation;
     private readonly JobMetrics _metrics;
@@ -63,7 +64,8 @@ public class JobService : IJobService
     ];
     private static readonly string[] JobCreatedConsumers =
     [
-        "NotificationService"
+        "NotificationService",
+        "ProjectService"
     ];
 
     /// <summary>
@@ -76,11 +78,13 @@ public class JobService : IJobService
         ISchedulingService schedulingService,
         ITimeEstimationService timeEstimation,
         JobMetrics metrics,
-        ILogger<JobService> logger)
+        ILogger<JobService> logger,
+        IProjectServiceClient projectServiceClient)
     {
         _dbContext = dbContext;
         _publishEndpoint = publishEndpoint;
         _orderServiceClient = orderServiceClient;
+        _projectServiceClient = projectServiceClient;
         _schedulingService = schedulingService;
         _timeEstimation = timeEstimation;
         _metrics = metrics;
@@ -610,11 +614,37 @@ public class JobService : IJobService
             throw;
         }
 
+        await LinkSourceProjectJobsAsync(createdJobs, cancellationToken);
+
         _metrics.RecordJobCreated(missingOrderItems.Count);
 
         _logger.LogInformation("Successfully created {Count} jobs for OrderId: {OrderId}", missingOrderItems.Count, orderId);
 
         return missingOrderItems.Count;
+    }
+
+    private async Task LinkSourceProjectJobsAsync(List<Job> createdJobs, CancellationToken cancellationToken)
+    {
+        foreach (var job in createdJobs)
+        {
+            if (job.SourceProjectPartId is not { } projectPartId || projectPartId == Guid.Empty)
+            {
+                continue;
+            }
+
+            try
+            {
+                await _projectServiceClient.LinkJobToPartAsync(projectPartId, job.Id, cancellationToken);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Could not link Job {JobId} to source ProjectPart {ProjectPartId}",
+                    job.Id,
+                    projectPartId);
+            }
+        }
     }
 
     /// <inheritdoc />

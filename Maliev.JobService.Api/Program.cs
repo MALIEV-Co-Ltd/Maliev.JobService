@@ -42,6 +42,7 @@ try
         });
 
         x.AddConsumer<OrderPaidEventConsumer>();
+        x.AddConsumer<PaymentCompletedJobCreationConsumer>();
         x.AddConsumer<OrderOutsourcingChangedConsumer>();
     });
 
@@ -54,6 +55,7 @@ try
 
     // Authenticated HTTP client for OrderService calls
     builder.AddAuthenticatedServiceClient<IOrderServiceClient, Maliev.JobService.Infrastructure.HttpClients.OrderServiceClient>("OrderService", sourceServiceName: "JobService");
+    builder.AddAuthenticatedServiceClient<IProjectServiceClient, Maliev.JobService.Infrastructure.HttpClients.ProjectServiceClient>("ProjectService", sourceServiceName: "JobService");
 
     // --- API Configuration ---
     builder.AddStandardCors();

@@ -46,5 +46,6 @@ public class JobServiceValidationTests
         null!,
         null!,
         null!,
+        null!,
         null!);
 }

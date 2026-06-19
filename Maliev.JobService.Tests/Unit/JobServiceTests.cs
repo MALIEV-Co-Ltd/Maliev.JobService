@@ -33,6 +33,7 @@ public class JobServiceTests : IAsyncLifetime
     private JobDbContext _dbContext = null!;
     private Mock<IPublishEndpoint> _publishEndpointMock = null!;
     private Mock<IOrderServiceClient> _orderServiceClientMock = null!;
+    private Mock<IProjectServiceClient> _projectServiceClientMock = null!;
     private Mock<ILogger<Infrastructure.Services.JobService>> _loggerMock = null!;
     private JobMetrics _metrics = null!;
     private Infrastructure.Services.JobService _service = null!;
@@ -54,6 +55,7 @@ public class JobServiceTests : IAsyncLifetime
 
         _publishEndpointMock = new Mock<IPublishEndpoint>();
         _orderServiceClientMock = new Mock<IOrderServiceClient>();
+        _projectServiceClientMock = new Mock<IProjectServiceClient>();
         _loggerMock = new Mock<ILogger<Infrastructure.Services.JobService>>();
 
         var meterFactory = new TestMeterFactory();
@@ -69,7 +71,8 @@ public class JobServiceTests : IAsyncLifetime
             scheduling,
             estimation,
             _metrics,
-            _loggerMock.Object);
+            _loggerMock.Object,
+            _projectServiceClientMock.Object);
     }
 
     public async Task DisposeAsync()
@@ -1073,6 +1076,7 @@ public class JobServiceTests : IAsyncLifetime
                 It.Is<JobCreatedEvent>(evt =>
                     evt.PublishedBy == "job-service" &&
                     evt.ConsumedBy.Contains("NotificationService") &&
+                    evt.ConsumedBy.Contains("ProjectService") &&
                     !evt.ConsumedBy.Contains("MaterialService") &&
                     evt.Payload.OrderId == orderId &&
                     evt.Payload.OrderItemId == firstItemId &&
@@ -1086,6 +1090,52 @@ public class JobServiceTests : IAsyncLifetime
                     evt.Payload.OrderItemId == secondItemId &&
                     evt.Payload.ProcessType == "SLA"),
                 It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateJobsForPaidOrderAsync_WhenOrderItemHasSourceProjectPart_LinksJobToProjectPart()
+    {
+        var orderId = Guid.NewGuid();
+        var orderItemId = Guid.NewGuid();
+        var sourceProjectPartId = Guid.NewGuid();
+        var projectClientMock = new Mock<IProjectServiceClient>();
+        var scheduling = new SchedulingService(_dbContext, NullLogger<SchedulingService>.Instance);
+        var estimation = new TimeEstimationService();
+        var service = new Infrastructure.Services.JobService(
+            _dbContext,
+            _publishEndpointMock.Object,
+            _orderServiceClientMock.Object,
+            scheduling,
+            estimation,
+            _metrics,
+            _loggerMock.Object,
+            projectClientMock.Object);
+
+        _orderServiceClientMock
+            .Setup(c => c.GetOrderItemsAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new OrderItemDto
+                {
+                    OrderItemId = orderItemId,
+                    SourceProjectPartId = sourceProjectPartId,
+                    MaterialId = Guid.NewGuid(),
+                    MaterialSnapshotJson = LockedMaterialSnapshot(),
+                    ConfigurationSnapshotJson = LockedConfigurationSnapshot(),
+                    Technology = "FDM",
+                    VolumeCm3 = 25,
+                    Quantity = 1,
+                    EstimatedPrintTimeMinutes = 60
+                }
+            ]);
+
+        var result = await service.CreateJobsForPaidOrderAsync(orderId);
+
+        Assert.Equal(1, result);
+        var job = await _dbContext.Jobs.SingleAsync(j => j.OrderId == orderId);
+        projectClientMock.Verify(
+            client => client.LinkJobToPartAsync(sourceProjectPartId, job.Id, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 

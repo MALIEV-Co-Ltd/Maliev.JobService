@@ -164,7 +164,7 @@ public sealed class OrderPaidEventConsumerTests
     }
 
     [Fact]
-    public async Task Consume_OrderPaidEvent_WithoutJobServiceRouting_IgnoresEvent()
+    public async Task Consume_OrderPaidEvent_WithoutJobServiceRouting_StillCreatesJobs()
     {
         var orderId = Guid.NewGuid();
         var consumer = new OrderPaidEventConsumer(_jobServiceMock.Object, _loggerMock.Object);
@@ -179,11 +179,8 @@ public sealed class OrderPaidEventConsumerTests
         await consumer.Consume(contextMock.Object);
 
         _jobServiceMock.Verify(
-            s => s.CreateJobsForPaidOrderAsync(
-                It.IsAny<Guid>(),
-                It.IsAny<string>(),
-                It.IsAny<CancellationToken>()),
-            Times.Never);
+            s => s.CreateJobsForPaidOrderAsync(orderId, It.IsAny<string>(), CancellationToken.None),
+            Times.Once);
     }
 
     [Fact]
@@ -208,11 +205,12 @@ public sealed class OrderPaidEventConsumerTests
     }
 
     [Fact]
-    public async Task Consume_OrderPaidEvent_WithoutRoutingList_IgnoresEvent()
+    public async Task Consume_OrderPaidEvent_WithoutRoutingList_StillCreatesJobs()
     {
+        var orderId = Guid.NewGuid();
         var consumer = new OrderPaidEventConsumer(_jobServiceMock.Object, _loggerMock.Object);
         var contextMock = new Mock<ConsumeContext<OrderPaidEvent>>();
-        contextMock.Setup(c => c.Message).Returns(BuildEvent(Guid.NewGuid()) with
+        contextMock.Setup(c => c.Message).Returns(BuildEvent(orderId) with
         {
             ConsumedBy = null!
         });
@@ -221,10 +219,7 @@ public sealed class OrderPaidEventConsumerTests
         await consumer.Consume(contextMock.Object);
 
         _jobServiceMock.Verify(
-            s => s.CreateJobsForPaidOrderAsync(
-                It.IsAny<Guid>(),
-                It.IsAny<string>(),
-                It.IsAny<CancellationToken>()),
-            Times.Never);
+            s => s.CreateJobsForPaidOrderAsync(orderId, It.IsAny<string>(), CancellationToken.None),
+            Times.Once);
     }
 }
