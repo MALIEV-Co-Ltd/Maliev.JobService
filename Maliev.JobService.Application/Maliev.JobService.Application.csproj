@@ -17,7 +17,7 @@
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
-		<PackageReference Include="Maliev.Aspire.ServiceDefaults" Version="$(SharedLibraryVersion)" />
+		<PackageReference Include="Maliev.Aspire.ServiceDefaults" Version="$(ServiceDefaultsVersion)" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -23,7 +23,10 @@ public sealed class OrderPaidEventConsumerTests
     private readonly Mock<IJobService> _jobServiceMock = new();
     private readonly Mock<ILogger<OrderPaidEventConsumer>> _loggerMock = new();
 
-    private static OrderPaidEvent BuildEvent(Guid orderId, string? orderNumber = null) =>
+    private static OrderPaidEvent BuildEvent(
+        Guid orderId,
+        string? orderNumber = null,
+        string providerName = "omise") =>
         new(
             MessageId: Guid.NewGuid(),
             MessageName: "OrderPaidEvent",
@@ -41,7 +44,19 @@ public sealed class OrderPaidEventConsumerTests
                 PaymentId: Guid.NewGuid(),
                 PaidAmount: 1_500.00,
                 Currency: "THB",
-                PaidAt: DateTimeOffset.UtcNow));
+                PaidAt: DateTimeOffset.UtcNow,
+                ProviderName: providerName));
+
+    /// <summary>
+    /// The canonical paid-order contract preserves the payment provider selected upstream.
+    /// </summary>
+    [Fact]
+    public void OrderPaidEvent_WithProviderName_PreservesCanonicalValue()
+    {
+        var message = BuildEvent(Guid.NewGuid(), providerName: "omise");
+
+        Assert.Equal("omise", message.Payload.ProviderName);
+    }
 
     /// <summary>
     /// When OrderPaidEvent arrives, the consumer delegates to
