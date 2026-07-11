@@ -16,3 +16,16 @@ build/
 .env*
 testresults/
 coverage/
+
+# Credential-free pull-request dependency reconstruction
+.ci-sources/
+.ci-nuget/
+.ci-packages/*
+!.ci-packages/*.nupkg
+!.ci-packages/*.snupkg
+!.ci-packages/SHA256SUMS
+
+# Build-only content
+.github/
+specs/
+Maliev.JobService.Tests/

@@ -1,5 +1,9 @@
 name: CI - Staging
 
+env:
+  ServiceDefaultsVersion: 1.0.81-alpha
+  MessagingContractsVersion: 1.0.91-alpha
+
 on:
   push:
     tags:
@@ -10,6 +14,10 @@ jobs:
     uses: ./.github/workflows/_build-and-test.yml
     with:
       solution_file: Maliev.JobService.slnx
+      extra_args: >-
+        -p:GITHUB_ACTIONS=true
+        -p:ServiceDefaultsVersion=1.0.81-alpha
+        -p:MessagingContractsVersion=1.0.91-alpha
     secrets:
       gitops_pat: ${{ secrets.GITOPS_PAT }}
 
@@ -39,6 +47,8 @@ jobs:
             docker build \
             --secret id=nuget_username,env=NUGET_USERNAME \
             --secret id=nuget_password,env=NUGET_PASSWORD \
+            --build-arg SERVICE_DEFAULTS_VERSION=${{ env.ServiceDefaultsVersion }} \
+            --build-arg MESSAGING_CONTRACTS_VERSION=${{ env.MessagingContractsVersion }} \
             -t asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-staging/maliev-job-service:$RELEASE_VERSION \
             -f Maliev.JobService.Api/Dockerfile .
           docker push asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-staging/maliev-job-service:$RELEASE_VERSION

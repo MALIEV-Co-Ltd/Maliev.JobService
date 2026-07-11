@@ -17,7 +17,10 @@ public sealed class PaymentCompletedJobCreationConsumerTests
     private readonly Mock<IJobService> _jobServiceMock = new();
     private readonly Mock<ILogger<PaymentCompletedJobCreationConsumer>> _loggerMock = new();
 
-    private static PaymentCompletedEvent BuildEvent(Guid orderId, string? orderNumber = null) =>
+    private static PaymentCompletedEvent BuildEvent(
+        Guid orderId,
+        string? orderNumber = null,
+        string providerName = "omise") =>
         new(
             MessageId: Guid.NewGuid(),
             MessageName: nameof(PaymentCompletedEvent),
@@ -35,7 +38,19 @@ public sealed class PaymentCompletedJobCreationConsumerTests
                 CustomerId: Guid.NewGuid().ToString("D"),
                 PaymentId: Guid.NewGuid(),
                 Amount: 1_500.00,
-                Currency: "THB"));
+                Currency: "THB",
+                ProviderName: providerName));
+
+    /// <summary>
+    /// The canonical payment contract preserves provider attribution for downstream consumers.
+    /// </summary>
+    [Fact]
+    public void PaymentCompletedEvent_WithProviderName_PreservesCanonicalValue()
+    {
+        var message = BuildEvent(Guid.NewGuid(), providerName: "omise");
+
+        Assert.Equal("omise", message.Payload.ProviderName);
+    }
 
     /// <summary>
     /// Routed payment completion events create missing production jobs using the order number lookup.
