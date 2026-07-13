@@ -3,16 +3,69 @@ using Maliev.JobService.Api.Controllers;
 using Maliev.JobService.Api.DTOs;
 using Maliev.JobService.Application.Abstractions;
 using Maliev.JobService.Application.Authorization;
+using Maliev.JobService.Application.Models;
 using Maliev.JobService.Domain.Entities;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using System.Security.Claims;
 using Xunit;
 
 namespace Maliev.JobService.Tests.Unit;
 
 public class JobControllerTests
 {
+    [Fact]
+    public async Task CreatePlanningHold_IntranetServiceIdentity_UsesTrustedDelegatedEmployeeActor()
+    {
+        var hold = CreateTestPlanningHold();
+        string? recordedActor = null;
+        var service = new Mock<IJobService>();
+        _ = service
+            .Setup(jobService => jobService.CreatePlanningHoldAsync(
+                It.IsAny<CreatePlanningHoldCommand>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<CreatePlanningHoldCommand, string, CancellationToken>((_, actor, _) => recordedActor = actor)
+            .ReturnsAsync(PlanningHoldOperationResult.Success(hold));
+        var controller = CreateController(
+            service.Object,
+            [
+                new Claim("sub", "system:service:intranetbff"),
+                new Claim("service_name", "IntranetBff"),
+                new Claim("user_type", "service")
+            ],
+            delegatedActor: "employee-123");
+
+        _ = await controller.CreatePlanningHold(new CreateProductionPlanningHoldRequest(), CancellationToken.None);
+
+        Assert.Equal("employee-123", recordedActor);
+    }
+
+    [Fact]
+    public async Task CreatePlanningHold_EndUserCannotSpoofDelegatedActorHeader()
+    {
+        var hold = CreateTestPlanningHold();
+        string? recordedActor = null;
+        var service = new Mock<IJobService>();
+        _ = service
+            .Setup(jobService => jobService.CreatePlanningHoldAsync(
+                It.IsAny<CreatePlanningHoldCommand>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<CreatePlanningHoldCommand, string, CancellationToken>((_, actor, _) => recordedActor = actor)
+            .ReturnsAsync(PlanningHoldOperationResult.Success(hold));
+        var controller = CreateController(
+            service.Object,
+            [new Claim(ClaimTypes.NameIdentifier, "employee-real")],
+            delegatedActor: "employee-spoofed");
+
+        _ = await controller.CreatePlanningHold(new CreateProductionPlanningHoldRequest(), CancellationToken.None);
+
+        Assert.Equal("employee-real", recordedActor);
+    }
+
     [Fact]
     public void GetPlanningHold_DeclaresExactVersionedResourceRoute()
     {
@@ -152,6 +205,22 @@ public class JobControllerTests
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
             ExpiresAt = DateTime.UtcNow.AddHours(72)
+        };
+    }
+
+    private static JobController CreateController(
+        IJobService service,
+        IReadOnlyCollection<Claim> claims,
+        string delegatedActor)
+    {
+        var context = new DefaultHttpContext
+        {
+            User = new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "Test"))
+        };
+        context.Request.Headers["X-Maliev-Delegated-Actor-Id"] = delegatedActor;
+        return new JobController(service, NullLogger<JobController>.Instance)
+        {
+            ControllerContext = new ControllerContext { HttpContext = context }
         };
     }
 }

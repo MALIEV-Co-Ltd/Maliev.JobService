@@ -18,6 +18,8 @@ namespace Maliev.JobService.Api.Controllers;
 [RequirePermission(JobPermissions.JobsRead)]
 public class JobController : ControllerBase
 {
+    private const string DelegatedActorHeader = "X-Maliev-Delegated-Actor-Id";
+    private const int MaxDelegatedActorLength = 256;
     private readonly IJobService _jobService;
     private readonly ILogger<JobController> _logger;
 
@@ -240,7 +242,10 @@ public class JobController : ControllerBase
         [FromBody] CreateProductionPlanningHoldRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _jobService.CreatePlanningHoldAsync(request.ToCommand(), GetCurrentUserId(), cancellationToken);
+        var result = await _jobService.CreatePlanningHoldAsync(
+            request.ToCommand(),
+            GetPlanningHoldActorId(),
+            cancellationToken);
         return ToPlanningHoldActionResult(result);
     }
 
@@ -542,5 +547,31 @@ public class JobController : ControllerBase
             ?? User.FindFirst("sub")?.Value
             ?? User.FindFirst("user_id")?.Value
             ?? "system";
+    }
+
+    private string GetPlanningHoldActorId()
+    {
+        var isTrustedIntranetService = string.Equals(
+                User.FindFirst("user_type")?.Value,
+                "service",
+                StringComparison.OrdinalIgnoreCase)
+            && string.Equals(
+                User.FindFirst("service_name")?.Value,
+                "IntranetBff",
+                StringComparison.OrdinalIgnoreCase);
+
+        if (isTrustedIntranetService
+            && Request.Headers.TryGetValue(DelegatedActorHeader, out var delegatedActors)
+            && delegatedActors.Count == 1)
+        {
+            var delegatedActor = delegatedActors[0]?.Trim();
+            if (!string.IsNullOrWhiteSpace(delegatedActor)
+                && delegatedActor.Length <= MaxDelegatedActorLength)
+            {
+                return delegatedActor;
+            }
+        }
+
+        return GetCurrentUserId();
     }
 }
