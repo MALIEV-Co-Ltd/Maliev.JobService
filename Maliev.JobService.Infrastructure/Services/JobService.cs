@@ -924,6 +924,14 @@ public class JobService : IJobService
     }
 
     /// <inheritdoc />
+    public Task<ProductionPlanningHold?> GetPlanningHoldAsync(
+        Guid id,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.ProductionPlanningHolds
+            .AsNoTracking()
+            .SingleOrDefaultAsync(hold => hold.Id == id, cancellationToken);
+
+    /// <inheritdoc />
     public async Task<PlanningHoldOperationResult> CreatePlanningHoldAsync(
         CreatePlanningHoldCommand command,
         string createdBy,
