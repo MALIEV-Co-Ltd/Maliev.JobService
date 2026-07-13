@@ -1439,6 +1439,40 @@ public class JobServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GetPlanningHoldAsync_ExistingHold_ReturnsAuthoritativeProjectOwnership()
+    {
+        var projectId = Guid.NewGuid();
+        var projectPartId = Guid.NewGuid();
+        var created = await _service.CreatePlanningHoldAsync(new CreatePlanningHoldCommand
+        {
+            ProjectId = projectId,
+            ProjectPartId = projectPartId,
+            Technology = "FDM",
+            MachineId = "FDM-03",
+            ScheduledStartTime = DateTime.UtcNow.AddHours(2),
+            SetupTimeMinutes = 15,
+            ProductionTimeMinutes = 45,
+            Quantity = 2,
+            ExpiresAt = DateTime.UtcNow.AddHours(72),
+        }, "planner");
+
+        var hold = await _service.GetPlanningHoldAsync(created.Hold!.Id);
+
+        Assert.NotNull(hold);
+        Assert.Equal(created.Hold.Id, hold.Id);
+        Assert.Equal(projectId, hold.ProjectId);
+        Assert.Equal(projectPartId, hold.ProjectPartId);
+    }
+
+    [Fact]
+    public async Task GetPlanningHoldAsync_UnknownHold_ReturnsNull()
+    {
+        var hold = await _service.GetPlanningHoldAsync(Guid.NewGuid());
+
+        Assert.Null(hold);
+    }
+
+    [Fact]
     public async Task GetQueueDepthByTechnologyAsync_IncludesActivePlanningHolds()
     {
         await _service.CreatePlanningHoldAsync(new CreatePlanningHoldCommand

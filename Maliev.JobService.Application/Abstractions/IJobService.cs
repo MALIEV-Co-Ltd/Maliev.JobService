@@ -177,6 +177,16 @@ public interface IJobService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets one production planning hold by its identifier.
+    /// </summary>
+    /// <param name="id">The planning hold identifier.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The matching planning hold, or <see langword="null"/> when it does not exist.</returns>
+    Task<ProductionPlanningHold?> GetPlanningHoldAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Creates a tentative production planning hold.
     /// </summary>
     /// <param name="command">The create command.</param>

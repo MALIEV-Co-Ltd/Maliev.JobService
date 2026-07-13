@@ -1,6 +1,8 @@
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.JobService.Api.Controllers;
 using Maliev.JobService.Api.DTOs;
 using Maliev.JobService.Application.Abstractions;
+using Maliev.JobService.Application.Authorization;
 using Maliev.JobService.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -11,6 +13,69 @@ namespace Maliev.JobService.Tests.Unit;
 
 public class JobControllerTests
 {
+    [Fact]
+    public void GetPlanningHold_DeclaresExactVersionedResourceRoute()
+    {
+        var action = typeof(JobController).GetMethod("GetPlanningHold");
+
+        Assert.NotNull(action);
+        var route = Assert.Single(action.GetCustomAttributes(typeof(HttpGetAttribute), inherit: false));
+        Assert.Equal("planning-holds/{id:guid}", Assert.IsType<HttpGetAttribute>(route).Template);
+        var permission = Assert.Single(action.GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: false));
+        Assert.Equal(JobPermissions.JobsRead, Assert.IsType<RequirePermissionAttribute>(permission).Permission);
+    }
+
+    [Fact]
+    public void JobServiceContract_DeclaresExactPlanningHoldLookup()
+    {
+        var method = typeof(IJobService).GetMethod("GetPlanningHoldAsync");
+
+        Assert.NotNull(method);
+        Assert.Equal(typeof(Task<ProductionPlanningHold?>), method.ReturnType);
+        Assert.Collection(
+            method.GetParameters(),
+            parameter => Assert.Equal(typeof(Guid), parameter.ParameterType),
+            parameter => Assert.Equal(typeof(CancellationToken), parameter.ParameterType));
+    }
+
+    [Fact]
+    public async Task GetPlanningHold_ExistingHold_ReturnsExistingDtoWithProjectOwnership()
+    {
+        var hold = CreateTestPlanningHold();
+        var service = new Mock<IJobService>();
+        _ = service
+            .Setup(jobService => jobService.GetPlanningHoldAsync(hold.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(hold);
+        var controller = new JobController(service.Object, NullLogger<JobController>.Instance);
+
+        ActionResult<ProductionPlanningHoldDto> result = await controller.GetPlanningHold(
+            hold.Id,
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var dto = Assert.IsType<ProductionPlanningHoldDto>(ok.Value);
+        Assert.Equal(hold.Id, dto.Id);
+        Assert.Equal(hold.ProjectId, dto.ProjectId);
+        Assert.Equal(hold.ProjectPartId, dto.ProjectPartId);
+    }
+
+    [Fact]
+    public async Task GetPlanningHold_UnknownHold_ReturnsNotFound()
+    {
+        var holdId = Guid.NewGuid();
+        var service = new Mock<IJobService>();
+        _ = service
+            .Setup(jobService => jobService.GetPlanningHoldAsync(holdId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ProductionPlanningHold?)null);
+        var controller = new JobController(service.Object, NullLogger<JobController>.Instance);
+
+        ActionResult<ProductionPlanningHoldDto> result = await controller.GetPlanningHold(
+            holdId,
+            CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
     [Fact]
     public async Task GetKanban_CompletedJobs_AreExposedAsQualityReviewPending()
     {
@@ -65,6 +130,28 @@ public class JobControllerTests
             Status = status,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
+        };
+    }
+
+    private static ProductionPlanningHold CreateTestPlanningHold()
+    {
+        return new ProductionPlanningHold
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = Guid.NewGuid(),
+            ProjectPartId = Guid.NewGuid(),
+            Technology = "FDM",
+            MachineId = "FDM-01",
+            ScheduledStartTime = DateTime.UtcNow.AddHours(1),
+            ScheduledEndTime = DateTime.UtcNow.AddHours(2),
+            SetupTimeMinutes = 15,
+            ProductionTimeMinutes = 45,
+            Quantity = 1,
+            Status = PlanningHoldStatus.Active,
+            CreatedBy = "planner",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddHours(72)
         };
     }
 }

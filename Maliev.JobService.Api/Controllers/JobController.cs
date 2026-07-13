@@ -213,6 +213,22 @@ public class JobController : ControllerBase
     }
 
     /// <summary>
+    /// Gets one tentative production planning hold by identifier.
+    /// </summary>
+    /// <param name="id">The planning hold identifier.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The matching planning hold, or 404 when it does not exist.</returns>
+    [HttpGet("planning-holds/{id:guid}")]
+    [RequirePermission(JobPermissions.JobsRead)]
+    public async Task<ActionResult<ProductionPlanningHoldDto>> GetPlanningHold(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var hold = await _jobService.GetPlanningHoldAsync(id, cancellationToken);
+        return hold is null ? NotFound() : Ok(ProductionPlanningHoldDto.FromEntity(hold));
+    }
+
+    /// <summary>
     /// Creates a tentative production planning hold.
     /// </summary>
     /// <param name="request">The create request.</param>
