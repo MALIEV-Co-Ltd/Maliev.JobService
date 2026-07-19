@@ -24,6 +24,7 @@ public sealed class DeploymentDependencyPinTests
 
         Assert.Contains("permissions:", workflow, StringComparison.Ordinal);
         Assert.Contains("contents: read", workflow, StringComparison.Ordinal);
+        Assert.Contains("packages: read", workflow, StringComparison.Ordinal);
         Assert.Contains("build-and-test:", workflow, StringComparison.Ordinal);
         Assert.Contains("uses: ./.github/workflows/_build-and-test.yml", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("deploy:", workflow, StringComparison.Ordinal);
