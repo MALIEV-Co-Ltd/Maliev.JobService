@@ -10,6 +10,30 @@ namespace Maliev.JobService.Tests.Deployment;
 public sealed class DeploymentDependencyPinTests
 {
     /// <summary>
+    /// Verifies branch pushes validate the exact source without mutating environment artifacts or GitOps state.
+    /// </summary>
+    [Theory]
+    [InlineData("ci-develop.yml")]
+    [InlineData("ci-staging.yml")]
+    [InlineData("ci-main.yml")]
+    public void BranchPushWorkflow_IsValidationOnly(string workflowName)
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var workflow = File.ReadAllText(
+            Path.Combine(repositoryRoot, ".github", "workflows", workflowName));
+
+        Assert.Contains("permissions:", workflow, StringComparison.Ordinal);
+        Assert.Contains("contents: read", workflow, StringComparison.Ordinal);
+        Assert.Contains("build-and-test:", workflow, StringComparison.Ordinal);
+        Assert.Contains("uses: ./.github/workflows/_build-and-test.yml", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("deploy:", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("google-github-actions/auth", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("gcloud", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("docker push", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("maliev-gitops", workflow, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// Verifies every package-mode boundary uses the reviewed ServiceDefaults and MessagingContracts releases.
     /// </summary>
     [Fact]
