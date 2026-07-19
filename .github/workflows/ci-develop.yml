@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
@@ -53,7 +53,7 @@ jobs:
           docker push asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-dev/maliev-job-service:${{ github.sha }}
 
       - name: Checkout maliev-gitops repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: MALIEV-Co-Ltd/maliev-gitops
           token: ${{ secrets.GITOPS_PAT }}
