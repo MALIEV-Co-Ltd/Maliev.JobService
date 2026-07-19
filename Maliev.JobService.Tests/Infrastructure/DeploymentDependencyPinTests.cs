@@ -19,8 +19,8 @@ public sealed class DeploymentDependencyPinTests
         var buildProperties = XDocument.Load(Path.Combine(repositoryRoot, "Directory.Build.props"));
         var propertyGroup = Assert.Single(buildProperties.Root!.Elements("PropertyGroup"));
 
-        Assert.Equal("1.0.81-alpha", propertyGroup.Element("ServiceDefaultsVersion")?.Value);
-        Assert.Equal("1.0.91-alpha", propertyGroup.Element("MessagingContractsVersion")?.Value);
+        Assert.Equal("1.0.93", propertyGroup.Element("ServiceDefaultsVersion")?.Value);
+        Assert.Equal("1.0.99-alpha", propertyGroup.Element("MessagingContractsVersion")?.Value);
         Assert.Null(propertyGroup.Element("SharedLibraryVersion"));
 
         foreach (var projectFile in Directory.EnumerateFiles(
@@ -51,8 +51,8 @@ public sealed class DeploymentDependencyPinTests
 
         var dockerfile = File.ReadAllText(
             Path.Combine(repositoryRoot, "Maliev.JobService.Api", "Dockerfile"));
-        Assert.Contains("ARG SERVICE_DEFAULTS_VERSION=1.0.81-alpha", dockerfile, StringComparison.Ordinal);
-        Assert.Contains("ARG MESSAGING_CONTRACTS_VERSION=1.0.91-alpha", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("ARG SERVICE_DEFAULTS_VERSION=1.0.93", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("ARG MESSAGING_CONTRACTS_VERSION=1.0.99-alpha", dockerfile, StringComparison.Ordinal);
         Assert.Contains("ENV GITHUB_ACTIONS=true", dockerfile, StringComparison.Ordinal);
         Assert.Contains("ARG dependency_restore_stage=restore-private", dockerfile, StringComparison.Ordinal);
         Assert.Contains("FROM build-base AS restore-local", dockerfile, StringComparison.Ordinal);
@@ -68,8 +68,8 @@ public sealed class DeploymentDependencyPinTests
         {
             var workflow = File.ReadAllText(
                 Path.Combine(repositoryRoot, ".github", "workflows", workflowName));
-            Assert.Contains("ServiceDefaultsVersion: 1.0.81-alpha", workflow, StringComparison.Ordinal);
-            Assert.Contains("MessagingContractsVersion: 1.0.91-alpha", workflow, StringComparison.Ordinal);
+            Assert.Contains("ServiceDefaultsVersion: 1.0.93", workflow, StringComparison.Ordinal);
+            Assert.Contains("MessagingContractsVersion: 1.0.99-alpha", workflow, StringComparison.Ordinal);
             Assert.DoesNotContain("SharedLibraryVersion", workflow, StringComparison.Ordinal);
             Assert.DoesNotContain("1.0.*", workflow, StringComparison.Ordinal);
         }
@@ -108,9 +108,9 @@ public sealed class DeploymentDependencyPinTests
         Assert.Contains("cancel-in-progress: true", workflow, StringComparison.Ordinal);
 
         Assert.Contains("repository: MALIEV-Co-Ltd/Maliev.MessagingContracts", workflow, StringComparison.Ordinal);
-        Assert.Contains("ref: 0bcd4c704d842211c5ff9bd6b9c4b3aacfcbd8e7", workflow, StringComparison.Ordinal);
+        Assert.Contains("ref: 9c41d6524a485bf03ba022b8170f47366ab1a77a", workflow, StringComparison.Ordinal);
         Assert.Contains("repository: MALIEV-Co-Ltd/Maliev.Aspire", workflow, StringComparison.Ordinal);
-        Assert.Contains("ref: 7121d57705fc1eff6c7ebb6a69e33e9c26ebfccc", workflow, StringComparison.Ordinal);
+        Assert.Contains("ref: 20a2746e024de6bd070b51af99bab7b761612c06", workflow, StringComparison.Ordinal);
         Assert.Contains("persist-credentials: false", workflow, StringComparison.Ordinal);
         Assert.Contains("prepare-job-ci-packages.sh", workflow, StringComparison.Ordinal);
         Assert.Contains("github.run_id", workflow, StringComparison.Ordinal);
@@ -149,10 +149,10 @@ public sealed class DeploymentDependencyPinTests
         Assert.Contains("<packageSource key=\"github\">", productionNuGetConfig, StringComparison.Ordinal);
         Assert.Contains("<package pattern=\"Maliev.*\" />", productionNuGetConfig, StringComparison.Ordinal);
 
-        Assert.Contains("messaging_commit=\"0bcd4c704d842211c5ff9bd6b9c4b3aacfcbd8e7\"", packageScript, StringComparison.Ordinal);
-        Assert.Contains("aspire_commit=\"7121d57705fc1eff6c7ebb6a69e33e9c26ebfccc\"", packageScript, StringComparison.Ordinal);
-        Assert.Contains("messaging_version=\"1.0.91-alpha\"", packageScript, StringComparison.Ordinal);
-        Assert.Contains("service_defaults_version=\"1.0.81-alpha\"", packageScript, StringComparison.Ordinal);
+        Assert.Contains("messaging_commit=\"9c41d6524a485bf03ba022b8170f47366ab1a77a\"", packageScript, StringComparison.Ordinal);
+        Assert.Contains("aspire_commit=\"20a2746e024de6bd070b51af99bab7b761612c06\"", packageScript, StringComparison.Ordinal);
+        Assert.Contains("messaging_version=\"1.0.99-alpha\"", packageScript, StringComparison.Ordinal);
+        Assert.Contains("service_defaults_version=\"1.0.93\"", packageScript, StringComparison.Ordinal);
         Assert.Contains("dotnet restore \"$generator_project\" --configfile \"$ci_nuget_config\"", packageScript, StringComparison.Ordinal);
         Assert.Contains("dotnet run --project tools/Generator/Generator.csproj --configuration Release --no-restore", packageScript, StringComparison.Ordinal);
         Assert.Contains("sha256sum", packageScript, StringComparison.Ordinal);

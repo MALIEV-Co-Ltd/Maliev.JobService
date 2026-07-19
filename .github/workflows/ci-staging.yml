@@ -1,8 +1,8 @@
 name: CI - Staging
 
 env:
-  ServiceDefaultsVersion: 1.0.81-alpha
-  MessagingContractsVersion: 1.0.91-alpha
+  ServiceDefaultsVersion: 1.0.93
+  MessagingContractsVersion: 1.0.99-alpha
 
 on:
   push:
@@ -16,8 +16,8 @@ jobs:
       solution_file: Maliev.JobService.slnx
       extra_args: >-
         -p:GITHUB_ACTIONS=true
-        -p:ServiceDefaultsVersion=1.0.81-alpha
-        -p:MessagingContractsVersion=1.0.91-alpha
+        -p:ServiceDefaultsVersion=1.0.93
+        -p:MessagingContractsVersion=1.0.99-alpha
     secrets:
       gitops_pat: ${{ secrets.GITOPS_PAT }}
 

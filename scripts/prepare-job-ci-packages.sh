@@ -4,10 +4,10 @@ set -euo pipefail
 readonly messaging_source="${1:-.ci-sources/Maliev.MessagingContracts}"
 readonly aspire_source="${2:-.ci-sources/Maliev.Aspire}"
 readonly output_path="${3:-.ci-packages}"
-readonly messaging_commit="0bcd4c704d842211c5ff9bd6b9c4b3aacfcbd8e7"
-readonly aspire_commit="7121d57705fc1eff6c7ebb6a69e33e9c26ebfccc"
-readonly messaging_version="1.0.91-alpha"
-readonly service_defaults_version="1.0.81-alpha"
+readonly messaging_commit="9c41d6524a485bf03ba022b8170f47366ab1a77a"
+readonly aspire_commit="20a2746e024de6bd070b51af99bab7b761612c06"
+readonly messaging_version="1.0.99-alpha"
+readonly service_defaults_version="1.0.93"
 readonly ci_nuget_config="$(pwd)/NuGet.PRValidation.Config"
 
 assert_checkout() {
