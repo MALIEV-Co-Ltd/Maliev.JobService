@@ -1,0 +1,31 @@
+**/.git
+**/.vs
+**/.vscode
+**/bin
+**/obj
+**/out
+**/*.user
+**/*.suo
+**/*.db
+**/*.log
+.dockerignore
+Dockerfile
+node_modules/
+dist/
+build/
+.env*
+testresults/
+coverage/
+
+# Credential-free pull-request dependency reconstruction
+.ci-sources/
+.ci-nuget/
+.ci-packages/*
+!.ci-packages/*.nupkg
+!.ci-packages/*.snupkg
+!.ci-packages/SHA256SUMS
+
+# Build-only content
+.github/
+specs/
+Maliev.JobService.Tests/

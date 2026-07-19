@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/specs/" />
+  <Project Path="Maliev.JobService.Api\Maliev.JobService.Api.csproj" />
+  <Project Path="Maliev.JobService.Application\Maliev.JobService.Application.csproj" />
+  <Project Path="Maliev.JobService.Domain\Maliev.JobService.Domain.csproj" />
+  <Project Path="Maliev.JobService.Infrastructure\Maliev.JobService.Infrastructure.csproj" />
+  <Project Path="Maliev.JobService.Tests\Maliev.JobService.Tests.csproj" />
+</Solution>
