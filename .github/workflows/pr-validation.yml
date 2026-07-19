@@ -16,8 +16,8 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: "1"
   DOTNET_NOLOGO: "1"
   NUGET_PACKAGES: ${{ github.workspace }}/.ci-nuget/packages
-  ServiceDefaultsVersion: 1.0.81-alpha
-  MessagingContractsVersion: 1.0.91-alpha
+  ServiceDefaultsVersion: 1.0.93
+  MessagingContractsVersion: 1.0.99-alpha
 
 jobs:
   dependency-packages:
@@ -36,7 +36,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: MALIEV-Co-Ltd/Maliev.MessagingContracts
-          ref: 0bcd4c704d842211c5ff9bd6b9c4b3aacfcbd8e7
+          ref: 9c41d6524a485bf03ba022b8170f47366ab1a77a
           path: .ci-sources/Maliev.MessagingContracts
           persist-credentials: false
 
@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: MALIEV-Co-Ltd/Maliev.Aspire
-          ref: 7121d57705fc1eff6c7ebb6a69e33e9c26ebfccc
+          ref: 20a2746e024de6bd070b51af99bab7b761612c06
           path: .ci-sources/Maliev.Aspire
           persist-credentials: false
 
@@ -113,14 +113,14 @@ jobs:
           dotnet restore Maliev.JobService.slnx
           --configfile NuGet.PRValidation.Config
           -p:GITHUB_ACTIONS=true
-          -p:ServiceDefaultsVersion=1.0.81-alpha
-          -p:MessagingContractsVersion=1.0.91-alpha
+          -p:ServiceDefaultsVersion=1.0.93
+          -p:MessagingContractsVersion=1.0.99-alpha
 
       - name: Record resolved package graph
         run: dotnet list Maliev.JobService.slnx package --include-transitive --no-restore
 
       - name: Build
-        run: dotnet build Maliev.JobService.slnx --configuration Release --no-restore -p:GITHUB_ACTIONS=true -p:ServiceDefaultsVersion=1.0.81-alpha -p:MessagingContractsVersion=1.0.91-alpha
+        run: dotnet build Maliev.JobService.slnx --configuration Release --no-restore -p:GITHUB_ACTIONS=true -p:ServiceDefaultsVersion=1.0.93 -p:MessagingContractsVersion=1.0.99-alpha
 
       - name: Test canonical payment consumers
         run: >-
@@ -131,11 +131,11 @@ jobs:
           --filter "FullyQualifiedName~PaymentCompletedJobCreationConsumerTests|FullyQualifiedName~OrderPaidEventConsumerTests"
           --verbosity normal
           -p:GITHUB_ACTIONS=true
-          -p:ServiceDefaultsVersion=1.0.81-alpha
-          -p:MessagingContractsVersion=1.0.91-alpha
+          -p:ServiceDefaultsVersion=1.0.93
+          -p:MessagingContractsVersion=1.0.99-alpha
 
       - name: Test
-        run: dotnet test Maliev.JobService.slnx --configuration Release --no-build --no-restore --verbosity normal -p:GITHUB_ACTIONS=true -p:ServiceDefaultsVersion=1.0.81-alpha -p:MessagingContractsVersion=1.0.91-alpha
+        run: dotnet test Maliev.JobService.slnx --configuration Release --no-build --no-restore --verbosity normal -p:GITHUB_ACTIONS=true -p:ServiceDefaultsVersion=1.0.93 -p:MessagingContractsVersion=1.0.99-alpha
 
       - name: Audit resolved NuGet graph
         run: dotnet list Maliev.JobService.slnx package --include-transitive --vulnerable --no-restore --configfile NuGet.PRValidation.Config
