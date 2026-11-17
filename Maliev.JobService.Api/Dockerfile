@@ -2,7 +2,7 @@
 
 ARG dependency_restore_stage=restore-private
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build-base
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build-base
 ARG BUILD_CONFIGURATION=Release
 ARG SERVICE_DEFAULTS_VERSION=1.0.93
 ARG MESSAGING_CONTRACTS_VERSION=1.0.99-alpha
